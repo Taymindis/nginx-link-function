@@ -1,0 +1,57 @@
+ngx_addon_name=ngx_http_c_func_module
+
+HTTP_C_FUNC_SRCS="$ngx_addon_dir/src/ngx_http_c_func_module.c \
+"
+
+HTTP_C_FUNC_DEPS="$NGX_ADDON_DEPS \
+"
+
+
+# version
+#
+HTTP_C_FUNC_DEFAULT_VERSION=1.11
+# HTTP_C_FUNC_VERSION=`git --git-dir=$ngx_addon_dir/.git describe 2>/dev/null`
+HTTP_C_FUNC_VERSION=${HTTP_C_FUNC_VERSION:-$HTTP_C_FUNC_DEFAULT_VERSION}
+#echo "#define NGINX_HTTP_HTTP_C_FUNC_VERSION \""$HTTP_C_FUNC_VERSION"\"" > $NGX_OBJS/ngx_vod_version.h
+
+
+# ngx_http_c_func_module headers
+# to Test this in order to share the header file to other client instead of just depend on it owns
+ngx_feature="ngx_http_c_func"
+ngx_feature_name="NGX_HAVE_HTTP_C_FUNC_HEADERS"
+ngx_feature_run=no
+ngx_feature_incs="#include <ngx_http_c_func_module.h>"
+ngx_feature_path=
+ngx_feature_libs=
+# ngx_feature_exit_if_not_found=yes
+ngx_feature_test="int ngx_http_c_func_module_current_version_=ngx_http_c_func_module_version_1_0;"
+. auto/feature
+
+if [ $ngx_found != yes ]; then
+echo "ngx_http_c_func_module.h not found in your system c header path, please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path with read and write permission given."
+echo "e.g install -m 644 ../nginx-c-function/src/ngx_http_c_func_module.h /usr/local/include/"
+echo
+exit 1
+else
+cat $ngx_addon_dir/build_test_resources/sanity_test_raw_parse.t > $ngx_addon_dir/t/sanity.t
+cc -shared -o $ngx_addon_dir/t/libcfuntest.so -fPIC $ngx_addon_dir/build_test_resources/cfuntest.c
+ABSOLUTE_NGX_CFUNC_CURRENT_PATH="$( cd "$ngx_addon_dir" ; pwd -P )"
+sed -i "s@NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH@$ABSOLUTE_NGX_CFUNC_CURRENT_PATH/t@g" $ngx_addon_dir/t/sanity.t
+fi
+
+
+if test -n "$ngx_module_link"; then
+    ngx_module_type=HTTP
+    ngx_module_name=$ngx_addon_name
+    ngx_module_deps="$HTTP_C_FUNC_DEPS"
+    ngx_module_srcs="$HTTP_C_FUNC_SRCS"
+    #ngx_module_libs=" -rdynamic -ldl -lpthread -lpcre -Wl,-E"
+    ngx_module_libs="-ldl -lm -lpthread -lpcre"
+    #ngx_module_libs="-lunwind-coredump -lunwind-generic -lunwind-ptrace -lunwind"
+    
+    . auto/module
+else
+  HTTP_MODULES="$HTTP_MODULES ngx_http_c_func_module"
+  NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_C_FUNC_SRCS"
+  NGX_ADDON_DEPS="$NGX_ADDON_DEPS $HTTP_C_FUNC_DEPS"
+fi

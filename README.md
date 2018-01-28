@@ -75,6 +75,16 @@ make -j2
 sudo make install
 ```
 
+#### ngx_http_c_func_module.h header not found when configure
+
+When first time configure this project, I purposely do not include this header, you may need to install it to your c header file as this header file need to share with your .so application as well.
+
+#### Example of installing header
+```bash
+install -m 644 /path/to/nginx-c-function/src/ngx_http_c_func_module.h /usr/local/include/
+```
+
+
 [Back to TOC](#table-of-contents)
 
 Test

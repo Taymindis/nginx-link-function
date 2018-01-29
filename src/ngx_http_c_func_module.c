@@ -64,6 +64,8 @@ void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
 void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
 u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
 void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
+void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size);
+void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size);
 void ngx_http_c_func_write_resp(
     ngx_http_c_func_request_t* req,
     uintptr_t status_code,
@@ -536,7 +538,7 @@ static ngx_int_t ngx_http_c_func_content_handler(ngx_http_request_t *r)
                 goto REQUEST_BODY_DONE;
             }
             buf = ngx_palloc(r->pool, (len + 1) );
-            ngx_memcpy(buf, b->pos, len);            
+            ngx_memcpy(buf, b->pos, len);
             buf[len] = '\0';
         }
         /************End REading ****************/
@@ -676,10 +678,9 @@ u_char*
 ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key) {
     ngx_http_request_t *r = (ngx_http_request_t*)req->__r__;
     ngx_list_part_t *part = &r->headers_in.headers.part;
-    ngx_table_elt_t *header;
+    ngx_table_elt_t *header = part->elts;
     unsigned int i;
     for (i = 0; /* void */; i++) {
-
         if (i >= part->nelts) {
             if (part->next == NULL) {
                 return NULL;
@@ -687,10 +688,13 @@ ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key) {
 
             part = part->next;
             header = part->elts;
-            if (ngx_strncmp(key, header[i].key.data , header[i].key.len) == 0 ) {
-                return header[i].value.data;
-            }
             i = 0;
+        }
+
+        if (ngx_strncmp(key, header[i].key.data , header[i].key.len) == 0 ) {
+            u_char *ret = ngx_pcalloc(r->pool, header[i].value.len + 1);
+            ngx_memcpy(ret, header[i].value.data, header[i].value.len);
+            return ret;
         }
     }
 }
@@ -728,6 +732,14 @@ ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key)
         } while (*qs);
     }
     return NULL;
+}
+
+void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size) {
+    return ngx_palloc( ((ngx_http_request_t*)req->__r__)->pool, size );
+}
+
+void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size) {
+    return ngx_pcalloc( ((ngx_http_request_t*)req->__r__)->pool, size );
 }
 
 void

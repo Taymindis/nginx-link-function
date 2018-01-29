@@ -60,6 +60,10 @@ extern void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char*
 extern void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
 extern void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
 extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
+extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
+extern void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size);
+extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size);
+
 extern void ngx_http_c_func_write_resp(
     ngx_http_c_func_request_t* req,
     uintptr_t status_code,
@@ -67,6 +71,3 @@ extern void ngx_http_c_func_write_resp(
     const char* content_type,
     const char* resp_content
 );
-
-
-extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);

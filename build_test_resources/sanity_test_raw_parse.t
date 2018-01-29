@@ -102,3 +102,19 @@ GET /testCFUNCERRORRESP?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2
 --- error_code: 500
 --- response_headers
 Content-Type: text/html
+
+
+=== TEST 7: Set C_FUNC_TEST_GET_CALLOC_FROM_POOL
+--- config
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFUNCCallocFromPool {
+    ngx_http_c_func_call "my_app_simple_get_calloc_from_pool";
+}
+--- request
+GET /testCFUNCCallocFromPool
+--- error_code: 200
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/This is the message calloc from pool$/
+

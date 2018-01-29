@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <ngx_http_c_func_module.h>
 
 
@@ -36,6 +37,38 @@ void my_app_simple_get_args(ngx_http_c_func_request_t* req) {
         "text/plain",
         req->args
     );
+}
+
+void my_app_simple_get_calloc_from_pool(ngx_http_c_func_request_t* req) {
+    char * my_log_message = ngx_http_c_func_pcalloc(req, sizeof("This is the message calloc from pool") + 1);
+
+    strcpy(my_log_message, "This is the message calloc from pool");
+
+    ngx_http_c_func_log_info(req, my_log_message);
+
+    ngx_http_c_func_write_resp(
+        req,
+        200,
+        "200 OK",
+        "text/plain",
+        my_log_message
+    );
+}
+
+void my_app_simple_get_header_param(ngx_http_c_func_request_t* req) {
+    u_char *req_content_type = ngx_http_c_func_get_header(req, "Host");
+
+    if (req_content_type) {
+        ngx_http_c_func_log_info(req, req_content_type);
+
+        ngx_http_c_func_write_resp(
+            req,
+            200,
+            "200 OK",
+            "text/plain",
+            req_content_type
+        );
+    }
 }
 
 void my_app_simple_get_token_args(ngx_http_c_func_request_t* req) {

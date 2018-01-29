@@ -8,18 +8,18 @@
 * @section LICENSE
 *
 * Copyright (c) 2018, Taymindis <cloudleware2015@gmail.com>
-* 
+*
 * This module is licensed under the terms of the BSD license.
-* 
+*
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are met:
-* 
+*
 * 1. Redistributions of source code must retain the above copyright notice, this
 *    list of conditions and the following disclaimer.
 * 2. Redistributions in binary form must reproduce the above copyright notice,
 *    this list of conditions and the following disclaimer in the documentation
 *    and/or other materials provided with the distribution.
-* 
+*
 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -42,11 +42,7 @@
 
 static ngx_int_t ngx_http_c_func_pre_configuration(ngx_conf_t *cf);
 static ngx_int_t ngx_http_c_func_post_configuration(ngx_conf_t *cf);
-// static char* ngx_http_c_func_enabled_tag(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char* ngx_http_c_func_set_str_slot_and_init_lib(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-// static char* ngx_http_c_func_noargs_call(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-// static void * ngx_http_c_func_create_main_conf(ngx_conf_t *cf);
-// static char *ngx_http_c_func_init_main_conf(ngx_conf_t *cf, void *conf);
 static void * ngx_http_c_func_create_srv_conf(ngx_conf_t *cf);
 static char * ngx_http_c_func_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
 static void * ngx_http_c_func_create_loc_conf(ngx_conf_t *cf);
@@ -57,7 +53,6 @@ static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r);
 static void ngx_http_c_func_module_exit(ngx_cycle_t *cycle);
 static ngx_int_t ngx_http_c_func_module_init(ngx_cycle_t *cycle);
 static void ngx_http_c_func_client_body_handler(ngx_http_request_t *r);
-// static ngx_int_t process_response(ngx_http_request_t *r, ngx_chain_t *out);
 static void ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle);
 static u_char* ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len);
 
@@ -91,7 +86,6 @@ typedef void (*ngx_http_c_func_noarg_fn)(void);
 
 
 typedef struct {
-    // unsigned has_init_app : 2;
     void *_app;
     ngx_str_t _libname;
 } ngx_http_c_func_srv_conf_t;
@@ -115,13 +109,9 @@ typedef struct {
 
 
 static ngx_queue_t c_func_apps_queue;
-// static ngx_flag_t is_ngx_http_c_func_module_enabled = 0;
-
-/* The c function greeting string **/
-// static u_char c_func_greeting[] = HELLO_C_FUN;
 
 /**
- * This module provided directive: c function greeting string.
+ * This module provided directive.
  *
  */
 static ngx_command_t ngx_http_c_func_commands[] = {
@@ -141,30 +131,6 @@ static ngx_command_t ngx_http_c_func_commands[] = {
         offsetof(ngx_http_c_func_loc_conf_t, _method_name), /* No offset when storing the module configuration on struct. */
         NULL
     },
-    // {
-    //     ngx_string("c_func_init_call"),
-    //     NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
-    //     ngx_http_c_func_noargs_call,
-    //     0,
-    //     0,
-    //     NULL
-    // },
-    // {
-    //     ngx_string("c_func_exit_call"),
-    //     NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
-    //     ngx_http_c_func_noargs_call,
-    //     0,
-    //     0,
-    //     NULL
-    // },
-    // {
-    //     ngx_string("num_of_apps"),
-    //     NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE1,
-    //     ngx_http_c_func_enabled_tag,
-    //     NGX_HTTP_MAIN_CONF_OFFSET,
-    //     offsetof(ngx_http_c_func_main_conf_t, num_of_apps),
-    //     NULL
-    // },
 
     ngx_null_command /* command termination */
 };
@@ -210,8 +176,6 @@ static char* ngx_http_c_func_set_str_slot_and_init_lib(ngx_conf_t *cf, ngx_comma
 
     value = cf->args->elts;
     if (value[1].len > 0) {
-        // printf("loading library %s\n", (char*) value[1].data);
-
         ngx_http_c_func_apps_t *app_lib = ngx_pcalloc(cf->pool, sizeof(ngx_http_c_func_apps_t));
         app_lib->_app = NULL;
 
@@ -335,40 +299,6 @@ ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
     ngx_queue_init(&c_func_apps_queue);
 
-
-    // ngx_http_c_func_apps_t one;
-    // one.data = 1;
-    // ngx_queue_init(&one._queue);
-    // ngx_queue_insert_tail(&c_func_apps_queue, &one._queue);
-
-    // printf("Inserted Tail\n");
-    // printf("Empty: %d\n", ngx_queue_empty(&c_func_apps_queue));
-
-    // ngx_http_c_func_apps_t two;
-    // two.data = 2;
-    // ngx_queue_init(&two._queue);
-    // ngx_queue_insert_tail(&c_func_apps_queue, &two._queue);
-
-    // ngx_queue_t* q = ngx_queue_head(&c_func_apps_queue);
-    // ngx_http_c_func_apps_t* pElement = ngx_queue_data(q, ngx_http_c_func_apps_t, _queue);
-
-    // printf("Head %d\n", pElement->data);
-
-    // ngx_queue_remove(q);
-
-    // printf("Removed\n");
-    // printf("Empty: %d\n", ngx_queue_empty(&c_func_apps_queue));
-
-    // q = ngx_queue_head(&c_func_apps_queue);
-    // pElement = ngx_queue_data(q, ngx_http_c_func_apps_t, _queue);
-
-    // printf("Head %d\n", pElement->data);
-
-    // ngx_queue_remove(q);
-    // printf("Removed\n");
-    // printf("Empty: %d\n", ngx_queue_empty(&c_func_apps_queue));
-
-
     return NGX_OK;
 }
 
@@ -378,16 +308,6 @@ static ngx_int_t ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
 //     ngx_http_c_func_main_conf_t *mcf;
 //     mcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
 
-//     if (mcf->is_enabled == 1) {
-//         if (mcf->num_of_apps > 0) {
-//             ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "number of apps = %d", mcf->num_of_apps);
-
-//         } else {
-//             ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "should specified apps count in main block e.g \" num_of_apps 2 \" means got 2 libraries need to be loaded", mcf->num_of_apps);
-//             mcf->is_enabled = 0;
-//             return NGX_ERROR;
-//         }
-//     }
     // If any linked libs
     if (! (ngx_queue_empty(&c_func_apps_queue)) ) {
         ngx_http_c_func_proceed_init_calls(cycle);
@@ -474,11 +394,6 @@ ngx_http_c_func_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_http_c_func_srv_conf_t *prev = parent;
     ngx_http_c_func_srv_conf_t *conf = child;
-
-
-    // if(ngx_strcmp(conf->_libname.data, prev->_libname.data) == 0) {
-    //     ngx_log_error(NGX_LOG_INFO, cf->log, 0, " The apps %V are sharing on server ", conf->_libname);
-    // }
 
 
     ngx_conf_merge_str_value(conf->_libname, prev->_libname, "");
@@ -603,23 +518,26 @@ static ngx_int_t ngx_http_c_func_content_handler(ngx_http_request_t *r)
                 goto REQUEST_BODY_DONE;
             }
 
-            buf = ngx_palloc(r->pool, len);
+            buf = ngx_palloc(r->pool, (len + 1) );
             if (buf == NULL) {
+                ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "insufficient memory.");
                 goto REQUEST_BODY_DONE;
             }
 
             p = buf;
-            // last = p + len;
             for (cl = r->request_body->bufs; cl; cl = cl->next) {
                 p = ngx_copy(p, cl->buf->pos, cl->buf->last - cl->buf->pos);
             }
+            buf[len] = '\0';
+
         } else {
             b = r->request_body->bufs->buf;
             if ((len = ngx_buf_size(b)) == 0) {
                 goto REQUEST_BODY_DONE;
             }
-            buf = b->pos;
-            // last = b->last;
+            buf = ngx_palloc(r->pool, (len + 1) );
+            ngx_memcpy(buf, b->pos, len);            
+            buf[len] = '\0';
         }
         /************End REading ****************/
 
@@ -728,31 +646,6 @@ ngx_http_c_func_client_body_handler(ngx_http_request_t *r)
         ngx_http_core_run_phases(r);
     }
 }
-
-// static ngx_int_t
-// process_response(ngx_http_request_t *r, ngx_chain_t *out) {
-/* Set the Content-Type header. */
-// r->headers_out.content_type.len = sizeof("text/plain") - 1;
-// r->headers_out.content_type.data = (u_char *) "text/plain";
-
-/* Allocate a new buffer for sending out the reply. */
-// ngx_buf_t *b = ngx_pcalloc(r->pool, sizeof(ngx_buf_t));
-
-/* Insertion in the buffer chain. */
-// out->buf = b;
-// out->next = NULL; /* just one buffer */
-
-// b->pos = c_func_greeting; /* first position in memory of the data */
-// b->last = c_func_greeting + sizeof(c_func_greeting); /* last position in memory of the data */
-// b->memory = 1; /* content is in read-only memory */
-// b->last_buf = 1; /* there will be no more buffers in the request */
-
-/* Sending the headers for the reply. */
-// r->headers_out.status = NGX_HTTP_OK; /* 200 status code */
-/* Get the content length of the body. */
-// r->headers_out.content_length_n = sizeof(c_func_greeting);
-// return ngx_http_send_header(r); /* Send the headers */
-// }
 
 /****** extern interface ********/
 void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg) {
@@ -907,10 +800,4 @@ ngx_http_c_func_write_resp(
 NGX_HTTTP_C_FUNC_WRITE_DONE:
     req->__rc__ = rc;
 }
-
-
-
-
-
-
 

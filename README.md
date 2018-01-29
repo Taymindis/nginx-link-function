@@ -120,7 +120,6 @@ void my_app_simple_get_greeting(ngx_http_c_func_request_t* req) {
 }
 
 
-
 void my_app_simple_get_args(ngx_http_c_func_request_t* req) {
     ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get_args");
 

@@ -262,7 +262,7 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle) {
                 ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "apps initializing");
                 /*** Init the apps ***/
                 ngx_http_c_func_ctx_t new_ctx; //config request
-                new_ctx.__log__ = &cycle->log;
+                new_ctx.__log__ = cycle->log;
                 func(&new_ctx);
             }
         }
@@ -340,7 +340,7 @@ static void ngx_http_c_func_module_exit(ngx_cycle_t *cycle) {
             } else {
                 ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
                 ngx_http_c_func_ctx_t new_ctx; //config request
-                new_ctx.__log__ = &cycle->log;
+                new_ctx.__log__ = cycle->log;
                 func(&new_ctx);
             }
         }
@@ -477,7 +477,7 @@ static ngx_int_t ngx_http_c_func_content_handler(ngx_http_request_t *r)
 
     ngx_http_c_func_ctx_t new_ctx;
     new_ctx.__r__ = r;
-    new_ctx.__log__ = &r->connection->log;
+    new_ctx.__log__ = r->connection->log;
 
     /***Set to default incase link library does not return anything ***/
     new_ctx.__rc__ = NGX_HTTP_INTERNAL_SERVER_ERROR;

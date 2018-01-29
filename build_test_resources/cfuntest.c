@@ -17,10 +17,10 @@ void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx) {
 
 
 void my_app_simple_get_greeting(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get");
+    ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get");
 
     ngx_http_c_func_write_resp(
-        req,
+        ctx,
         200,
         "200 OK",
         "text/plain",
@@ -31,10 +31,10 @@ void my_app_simple_get_greeting(ngx_http_c_func_ctx_t *ctx) {
 
 
 void my_app_simple_get_args(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log(info, req, "Calling back and log from my_app_simple_get_args");
+    ngx_http_c_func_log(info, ctx, "Calling back and log from my_app_simple_get_args");
 
     ngx_http_c_func_write_resp(
-        req,
+        ctx,
         200,
         "200 OK",
         "text/plain",
@@ -43,14 +43,14 @@ void my_app_simple_get_args(ngx_http_c_func_ctx_t *ctx) {
 }
 
 void my_app_simple_get_calloc_from_pool(ngx_http_c_func_ctx_t *ctx) {
-    char * my_log_message = ngx_http_c_func_pcalloc(req, sizeof("This is the message calloc from pool") + 1);
+    char * my_log_message = ngx_http_c_func_pcalloc(ctx, sizeof("This is the message calloc from pool") + 1);
 
     strcpy(my_log_message, "This is the message calloc from pool");
 
-    ngx_http_c_func_log_info(req, my_log_message);
+    ngx_http_c_func_log_info(ctx, my_log_message);
 
     ngx_http_c_func_write_resp(
-        req,
+        ctx,
         200,
         "200 OK",
         "text/plain",
@@ -59,13 +59,13 @@ void my_app_simple_get_calloc_from_pool(ngx_http_c_func_ctx_t *ctx) {
 }
 
 void my_app_simple_get_header_param(ngx_http_c_func_ctx_t *ctx) {
-    u_char *req_content_type = ngx_http_c_func_get_header(req, "Host");
+    u_char *req_content_type = ngx_http_c_func_get_header(ctx, "Host");
 
     if (req_content_type) {
-        ngx_http_c_func_log_info(req, req_content_type);
+        ngx_http_c_func_log_info(ctx, req_content_type);
 
         ngx_http_c_func_write_resp(
-            req,
+            ctx,
             200,
             "200 OK",
             "text/plain",
@@ -75,12 +75,12 @@ void my_app_simple_get_header_param(ngx_http_c_func_ctx_t *ctx) {
 }
 
 void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log(info, req, "Calling back and log from my_app_simple_get_token_args");
+    ngx_http_c_func_log(info, ctx, "Calling back and log from my_app_simple_get_token_args");
 
-    char * tokenArgs = ngx_http_c_func_get_query_param(req, "token");
+    char * tokenArgs = ngx_http_c_func_get_query_param(ctx, "token");
     if (! tokenArgs) {
         ngx_http_c_func_write_resp(
-            req,
+            ctx,
             401,
             "401 unauthorized",
             "text/plain",
@@ -88,7 +88,7 @@ void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
         );
     } else {
         ngx_http_c_func_write_resp(
-            req,
+            ctx,
             401,
             "401 unauthorized",
             "text/plain",
@@ -98,10 +98,10 @@ void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
 }
 
 void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_post");
+    ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_post");
 
     ngx_http_c_func_write_resp(
-        req,
+        ctx,
         202,
         "202 Accepted and Processing",
         "text/plain",
@@ -112,7 +112,7 @@ void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
 
 
 void my_app_simple_get_no_resp(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get_no_resp");
+    ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get_no_resp");
 
 
 }

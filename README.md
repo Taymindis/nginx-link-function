@@ -1,20 +1,33 @@
 nginx-c-function
 ================
 
-It is a NGINX module that allow you to link your .so(c/c++) libs in server context and call the function of .so libs in location directive.
+It is a NGINX module that allow you to link your .so(c/c++) application in server context and call the function of .so application in location directive.
 
 Table of Contents
 =================
 
-* [Usage](#usage)
 * [Introduction](#introduction)
+* [How it works](#how-it-works)
+* [Usage](#usage)
 * [Installation](#installation)
 * [Sample Application Development](#sample-application-development)
 * [Test](#test)
 * [Copyright & License](#copyright--license)
 
+Introduction
+============
+
+nginx-c-function is a nginx module which allow to link the .so(c/c++) application in nginx config, and call the function of .so file in location context area. Therefore, you could direct link your C/C++ application to nginx server.
+
+
+How it works
+============
+
+![Image of nginx-c-function](nginx-c-function-architecture.png)
+
+
 Usage
-=========
+=======
 ```nginx
 # nginx.conf
 
@@ -56,11 +69,6 @@ server {
 }
 ```
 
-
-Introduction
-============
-
-nginx-c-function is a nginx module which allow to link the .so(c/c++) lib in nginx config, and call the function of .so file in location context area. Therefore, you could direct link your C/C++ application to nginx server.
 
 Installation
 ============

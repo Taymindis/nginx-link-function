@@ -655,16 +655,16 @@ ngx_http_c_func_client_body_handler(ngx_http_request_t *r)
 
 /****** extern interface ********/
 void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg) {
-    ngx_log_error(NGX_LOG_DEBUG, *((ngx_log_t *)ctx->__log__), 0, "%s", msg);
+    ngx_log_error(NGX_LOG_DEBUG, (ngx_log_t *)ctx->__log__, 0, "%s", msg);
 }
 void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg) {
-    ngx_log_error(NGX_LOG_INFO, *((ngx_log_t *)ctx->__log__), 0, "%s", msg);
+    ngx_log_error(NGX_LOG_INFO, (ngx_log_t *)ctx->__log__, 0, "%s", msg);
 }
 void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg) {
-    ngx_log_error(NGX_LOG_WARN, *((ngx_log_t *)ctx->__log__), 0, "%s", msg);
+    ngx_log_error(NGX_LOG_WARN, (ngx_log_t *)ctx->__log__, 0, "%s", msg);
 }
 void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg) {
-    ngx_log_error(NGX_LOG_ERR, *((ngx_log_t *)ctx->__log__), 0, "%s", msg);
+    ngx_log_error(NGX_LOG_ERR, (ngx_log_t *)ctx->__log__, 0, "%s", msg);
 }
 
 static u_char*

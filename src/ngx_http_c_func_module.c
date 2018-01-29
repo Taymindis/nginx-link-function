@@ -474,6 +474,7 @@ static ngx_int_t ngx_http_c_func_content_handler(ngx_http_request_t *r)
 
     ngx_http_c_func_request_t new_request;
     new_request.__r__ = r;
+    new_request.__log__ = &r->connection->log;
 
     /***Set to default incase link library does not return anything ***/
     new_request.__rc__ = NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -651,16 +652,16 @@ ngx_http_c_func_client_body_handler(ngx_http_request_t *r)
 
 /****** extern interface ********/
 void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg) {
-    ngx_log_error(NGX_LOG_DEBUG, ((ngx_http_request_t *)req->__r__)->connection->log, 0, "%s", msg);
+    ngx_log_error(NGX_LOG_DEBUG, *((ngx_log_t *)req->__log__), 0, "%s", msg);
 }
 void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg) {
-    ngx_log_error(NGX_LOG_INFO, ((ngx_http_request_t *)req->__r__)->connection->log, 0, "%s", msg);
+    ngx_log_error(NGX_LOG_INFO, *((ngx_log_t *)req->__log__), 0, "%s", msg);
 }
 void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg) {
-    ngx_log_error(NGX_LOG_WARN, ((ngx_http_request_t *)req->__r__)->connection->log, 0, "%s", msg);
+    ngx_log_error(NGX_LOG_WARN, *((ngx_log_t *)req->__log__), 0, "%s", msg);
 }
 void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg) {
-    ngx_log_error(NGX_LOG_ERR, ((ngx_http_request_t *)req->__r__)->connection->log, 0, "%s", msg);
+    ngx_log_error(NGX_LOG_ERR, *((ngx_log_t *)req->__log__), 0, "%s", msg);
 }
 
 static u_char*

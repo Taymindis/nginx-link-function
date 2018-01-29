@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_1_0 1
+#define ngx_http_c_func_module_version_2 2
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -52,6 +52,7 @@ typedef struct {
 
 	/* internal */
 	void* __r__;
+	void* __log__;
 	intptr_t __rc__;
 } ngx_http_c_func_request_t;
 

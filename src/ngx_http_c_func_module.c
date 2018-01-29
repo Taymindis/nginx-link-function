@@ -62,6 +62,10 @@ void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg);
 void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg);
 void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
 void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
+void ngx_http_c_func_conf_log_debug(void *cycle, const char* msg);
+void ngx_http_c_func_conf_log_info(void *cycle, const char* msg);
+void ngx_http_c_func_conf_log_warn(void *cycle, const char* msg);
+void ngx_http_c_func_conf_log_err(void *cycle, const char* msg);
 u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
 void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
 void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size);
@@ -84,7 +88,7 @@ void ngx_http_c_func_write_resp(
 // } ngx_http_c_func_main_conf_t;
 
 typedef void (*ngx_http_c_func_app_handler)(ngx_http_c_func_request_t*);
-typedef void (*ngx_http_c_func_noarg_fn)(void);
+typedef void (*ngx_http_c_func_client_conf_fn)(void *cycle);
 
 
 typedef struct {
@@ -252,7 +256,7 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle) {
     do {
         ngx_http_c_func_apps_t* app_lib = ngx_queue_data(q, ngx_http_c_func_apps_t, _queue);
 
-        ngx_http_c_func_noarg_fn func;
+        ngx_http_c_func_client_conf_fn func;
         if (app_lib->_app) {
             *(void**)(&func) = dlsym(app_lib->_app, (const char*)"ngx_http_c_func_init");
             if ((error = dlerror()) != NULL) {
@@ -261,7 +265,7 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle) {
             } else {
                 ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "apps initializing");
                 /*** Init the apps ***/
-                func();
+                func(cycle);
             }
         }
     } while ( (q = q->next) != &c_func_apps_queue);
@@ -330,14 +334,14 @@ static void ngx_http_c_func_module_exit(ngx_cycle_t *cycle) {
         ngx_http_c_func_apps_t* app_lib = ngx_queue_data(q, ngx_http_c_func_apps_t, _queue);
 
 
-        ngx_http_c_func_noarg_fn func;
+        ngx_http_c_func_client_conf_fn func;
         if (app_lib->_app) {
             *(void**)(&func) = dlsym(app_lib->_app, (const char*)"ngx_http_c_func_exit");
             if ((error = dlerror()) != NULL) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error function call %s", error);
             } else {
                 ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "apps Exiting status ");
-                func();
+                func(cycle);
             }
         }
 
@@ -661,6 +665,19 @@ void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg) {
 }
 void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg) {
     ngx_log_error(NGX_LOG_ERR, ((ngx_http_request_t *)req->__r__)->connection->log, 0, "%s", msg);
+}
+
+void ngx_http_c_func_conf_log_debug(void* cycle, const char* msg) {
+    ngx_log_error(NGX_LOG_DEBUG, ((ngx_cycle_t *)cycle)->log, 0, "%s", msg);
+}
+void ngx_http_c_func_conf_log_info(void *cycle, const char* msg) {
+    ngx_log_error(NGX_LOG_INFO, ((ngx_cycle_t *)cycle)->log, 0, "%s", msg);    
+}
+void ngx_http_c_func_conf_log_warn(void *cycle, const char* msg) {
+    ngx_log_error(NGX_LOG_WARN, ((ngx_cycle_t *)cycle)->log, 0, "%s", msg);    
+}
+void ngx_http_c_func_conf_log_err(void *cycle, const char* msg) {
+    ngx_log_error(NGX_LOG_ERR, ((ngx_cycle_t *)cycle)->log, 0, "%s", msg);
 }
 
 static u_char*

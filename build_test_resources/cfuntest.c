@@ -6,10 +6,12 @@
 /***gcc -shared -o libcfuntest.so -fPIC cfuntest.c***/
 /***cp libcfuntest.so /etc/nginx/***/
 
-int count = 99;
+int is_service_on = 0;
 
-void ngx_http_c_func_init() {
-    ++count;
+void ngx_http_c_func_init(void *conf) {
+    ngx_http_c_func_conf_log(info, conf, "%s", "Starting The Application");
+
+    is_service_on=1;
 }
 
 
@@ -28,7 +30,7 @@ void my_app_simple_get_greeting(ngx_http_c_func_request_t* req) {
 
 
 void my_app_simple_get_args(ngx_http_c_func_request_t* req) {
-    ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get_args");
+    ngx_http_c_func_log(info, req, "Calling back and log from my_app_simple_get_args");
 
     ngx_http_c_func_write_resp(
         req,
@@ -72,7 +74,7 @@ void my_app_simple_get_header_param(ngx_http_c_func_request_t* req) {
 }
 
 void my_app_simple_get_token_args(ngx_http_c_func_request_t* req) {
-    ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get_token_args");
+    ngx_http_c_func_log(info, req, "Calling back and log from my_app_simple_get_token_args");
 
     char * tokenArgs = ngx_http_c_func_get_query_param(req, "token");
     if (! tokenArgs) {
@@ -115,6 +117,7 @@ void my_app_simple_get_no_resp(ngx_http_c_func_request_t* req) {
 }
 
 
-void ngx_http_c_func_exit() {
-    ++count;
+void ngx_http_c_func_exit(void *conf) {
+    ngx_http_c_func_conf_log(info, conf, "%s", "Shutting down The Application");
+    is_service_on = 0;
 }

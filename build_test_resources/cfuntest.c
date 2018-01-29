@@ -9,7 +9,7 @@
 int is_service_on = 0;
 
 void ngx_http_c_func_init() {
-    printf("%s", "Starting The Application");
+    printf("%s\n", "Starting The Application");
 
     is_service_on=1;
 }
@@ -118,6 +118,6 @@ void my_app_simple_get_no_resp(ngx_http_c_func_request_t* req) {
 
 
 void ngx_http_c_func_exit() {
-    printf("%s", "Shutting down The Application");
+    printf("%s\n", "Shutting down The Application");
     is_service_on = 0;
 }

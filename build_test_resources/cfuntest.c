@@ -8,8 +8,8 @@
 
 int is_service_on = 0;
 
-void ngx_http_c_func_init(void *conf) {
-    ngx_http_c_func_conf_log(info, conf, "%s", "Starting The Application");
+void ngx_http_c_func_init() {
+    printf("%s", "Starting The Application");
 
     is_service_on=1;
 }
@@ -117,7 +117,7 @@ void my_app_simple_get_no_resp(ngx_http_c_func_request_t* req) {
 }
 
 
-void ngx_http_c_func_exit(void *conf) {
-    ngx_http_c_func_conf_log(info, conf, "%s", "Shutting down The Application");
+void ngx_http_c_func_exit() {
+    printf("%s", "Shutting down The Application");
     is_service_on = 0;
 }

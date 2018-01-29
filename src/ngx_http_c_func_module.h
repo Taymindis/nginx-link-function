@@ -60,11 +60,6 @@ extern void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char*
 extern void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
 extern void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
 
-extern void ngx_http_c_func_conf_log_debug(void *cycle, const char* msg);
-extern void ngx_http_c_func_conf_log_info(void *cycle, const char* msg);
-extern void ngx_http_c_func_conf_log_warn(void *cycle, const char* msg);
-extern void ngx_http_c_func_conf_log_err(void *cycle, const char* msg);
-
 extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
 extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
 extern void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size);
@@ -74,11 +69,6 @@ extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size
 char __buff__[200];\
 snprintf(__buff__, 200, ##__VA_ARGS__);\
 ngx_http_c_func_log_##loglevel(req_context, __buff__);\
-})
-#define ngx_http_c_func_conf_log(loglevel, cycle_context, ...) ({\
-char __buff__[200];\
-snprintf(__buff__, 200, ##__VA_ARGS__);\
-ngx_http_c_func_log_##loglevel(cycle_context, __buff__);\
 })
 
 extern void ngx_http_c_func_write_resp(

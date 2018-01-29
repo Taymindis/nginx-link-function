@@ -12,6 +12,7 @@ Table of Contents
 * [Installation](#installation)
 * [Sample Application Development](#sample-application-development)
 * [Test](#test)
+* [Support](#support)
 * [Copyright & License](#copyright--license)
 
 Introduction
@@ -34,7 +35,7 @@ Usage
 server {
   listen 8888;
   ...
-  ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
+  ngx_http_c_func_link_lib "/path/to/your/libcfuntest.so";
   ...
   ...
   location = /testCFunGreeting {
@@ -45,7 +46,7 @@ server {
 server {
   listen 8989;
   ...
-  ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so"; # sharing with server 1
+  ngx_http_c_func_link_lib "/path/to/your/libcfuntest.so"; # sharing data memory with server 1 if the path are same with server 1
   ...
   ...
   location = /testCFunGreeting {
@@ -56,7 +57,7 @@ server {
 server {
   listen 8999;
   ...
-  ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest2.so"; # another application
+  ngx_http_c_func_link_lib "/path/to/your/libcfuntest2.so"; # another application
   ...
   ...
   location = /testPost {
@@ -295,6 +296,14 @@ cd /path/to/nginx-c-function
 export PATH=/path/to/nginx-dirname:$PATH 
 sudo prove -r t/
 ```
+
+[Back to TOC](#table-of-contents)
+
+Support
+=======
+
+Please do not hesitate to contact minikawoon2017@gmail.com/minikawoon99@gmail.com for any queries.
+
 
 [Back to TOC](#table-of-contents)
 

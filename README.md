@@ -97,6 +97,76 @@ install -m 644 /path/to/nginx-c-function/src/ngx_http_c_func_module.h /usr/local
 [Back to TOC](#table-of-contents)
 
 
+Interface that expose to client application
+============================================
+
+This is the interface that you can use to get more details from nginx server, it all inside the ngx_http_c_func_module.h.
+
+```c
+
+#define ngx_http_c_func_content_type_plaintext "text/plain"
+#define ngx_http_c_func_content_type_html "text/html; charset=utf-8"
+#define ngx_http_c_func_content_type_json "application/json"
+#define ngx_http_c_func_content_type_jsonp "application/javascript"
+#define ngx_http_c_func_content_type_xformencoded "application/x-www-form-urlencoded"
+
+typedef struct {
+	char *args; // Uri Args
+	u_char *body; // Request Body
+
+	/* internal */
+	void* __r__;
+	intptr_t __rc__;
+} ngx_http_c_func_request_t;
+
+extern void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg);
+extern void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg);
+extern void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
+extern void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
+extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
+extern void ngx_http_c_func_write_resp(
+    ngx_http_c_func_request_t* req,
+    uintptr_t status_code,
+    const char* status_line,
+    const char* content_type,
+    const char* resp_content
+);
+
+extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
+
+```
+
+## Interface break down details
+
+#### get the request header parameter from 
+```c
+extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
+```
+
+#### get the uri args
+```c
+req->args;
+```
+
+#### get the query parameter
+```c
+extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
+```
+
+#### get the request body
+```c
+req->body;
+```
+
+#### loggin to nginx server
+```c
+extern void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg);
+extern void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg);
+extern void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
+extern void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
+```
+
+
 Sample Application Development
 ===============================
 

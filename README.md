@@ -277,6 +277,12 @@ void ngx_http_c_func_exit() {
 }
 ```
 
+#### Noted: 
+The c-func init and exit are reserved function when started the nginx, it will call init method, when stop nginx, it will call exit function.
+```c
+void ngx_http_c_func_init(){}
+void ngx_http_c_func_exit(){}
+```
 
 Test
 =====

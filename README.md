@@ -112,25 +112,26 @@ This is the interface that you can use to get more details from nginx server, it
 #define ngx_http_c_func_content_type_xformencoded "application/x-www-form-urlencoded"
 
 typedef struct {
-	char *args; // Uri Args
-	u_char *body; // Request Body
+  char *req_args; // Uri Args
+  u_char *req_body; // Request Body
 
-	/* internal */
-	void* __r__;
-	intptr_t __rc__;
-} ngx_http_c_func_request_t;
+  /* internal */
+  void* __r__;
+  void* __log__;
+  intptr_t __rc__;
+} ngx_http_c_func_ctx_t;
 
-extern void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
-extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
-extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
-extern void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size);
-extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size);
+extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key);
+extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
+extern void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 
 extern void ngx_http_c_func_write_resp(
-    ngx_http_c_func_request_t* req,
+    ngx_http_c_func_ctx_t *ctx,
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,
@@ -143,42 +144,42 @@ extern void ngx_http_c_func_write_resp(
 
 #### malloc/calloc from nginx pool
 ```c
-void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size);
-void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size);
+void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 ```
 
 #### get the request header parameter from 
 ```c
-extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
+extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key);
 ```
 
 #### get the uri args
 ```c
-req->args;
+ctx->req_args;
 ```
 
 #### get the query parameter
 ```c
-extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
+extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
 ```
 
 #### get the request body
 ```c
-req->body;
+ctx->req_body;
 ```
 
 #### loggin to nginx server
 ```c
-extern void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
+extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg);
 ```
 
 #### Response out
 ```c
 extern void ngx_http_c_func_write_resp(
-    ngx_http_c_func_request_t* req,
+    ngx_http_c_func_ctx_t *ctx,
     uintptr_t status_code, // Status code
     const char* status_line, // Status line
     const char* content_type, // Response content type
@@ -205,7 +206,7 @@ void ngx_http_c_func_init() {
 }
 
 
-void my_app_simple_get_greeting(ngx_http_c_func_request_t* req) {
+void my_app_simple_get_greeting(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get");
 
     ngx_http_c_func_write_resp(
@@ -217,7 +218,7 @@ void my_app_simple_get_greeting(ngx_http_c_func_request_t* req) {
     );
 }
 
-void my_app_simple_get_args(ngx_http_c_func_request_t* req) {
+void my_app_simple_get_args(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get_args");
 
     ngx_http_c_func_write_resp(
@@ -225,11 +226,11 @@ void my_app_simple_get_args(ngx_http_c_func_request_t* req) {
         200,
         "200 OK",
         "text/plain",
-        req->args
+        ctx->req_args
     );
 }
 
-void my_app_simple_get_token_args(ngx_http_c_func_request_t* req) {
+void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get_token_args");
 
     char * tokenArgs = ngx_http_c_func_get_query_param(req, "token");
@@ -252,7 +253,7 @@ void my_app_simple_get_token_args(ngx_http_c_func_request_t* req) {
     }
 }
 
-void my_app_simple_post(ngx_http_c_func_request_t* req) {
+void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_post");
 
     ngx_http_c_func_write_resp(
@@ -260,13 +261,13 @@ void my_app_simple_post(ngx_http_c_func_request_t* req) {
         202,
         "202 Accepted and Processing",
         "text/plain",
-        req->body
+        ctx->req_body
     );
 }
 
 
 
-void my_app_simple_get_no_resp(ngx_http_c_func_request_t* req) {
+void my_app_simple_get_no_resp(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(req, "Calling back and log from my_app_simple_get_no_resp");
 
 

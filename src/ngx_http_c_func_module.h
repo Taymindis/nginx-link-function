@@ -47,24 +47,24 @@
 
 
 typedef struct {
-	char *args; // Uri Args
-	u_char *body; // Request Body
+	char *req_args; // Uri Args
+	u_char *req_body; // Request Body
 
 	/* internal */
 	void* __r__;
 	void* __log__;
 	intptr_t __rc__;
-} ngx_http_c_func_request_t;
+} ngx_http_c_func_ctx_t;
 
-extern void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
-extern void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
+extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg);
 
-extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
-extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
-extern void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size);
-extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size);
+extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key);
+extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
+extern void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 
 #define ngx_http_c_func_log(loglevel, req_context, ...) ({\
 char __buff__[200];\
@@ -73,7 +73,7 @@ ngx_http_c_func_log_##loglevel(req_context, __buff__);\
 })
 
 extern void ngx_http_c_func_write_resp(
-    ngx_http_c_func_request_t* req,
+    ngx_http_c_func_ctx_t *ctx,
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,

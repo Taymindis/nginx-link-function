@@ -58,16 +58,16 @@ static u_char* ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t 
 
 
 /*Extern interface*/
-void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg);
-void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg);
-void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg);
-void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg);
-u_char* ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key);
-void* ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key);
-void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size);
-void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size);
+void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
+void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg);
+void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg);
+void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg);
+u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key);
+void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
+void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 void ngx_http_c_func_write_resp(
-    ngx_http_c_func_request_t* req,
+    ngx_http_c_func_ctx_t *ctx,
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,
@@ -83,8 +83,8 @@ void ngx_http_c_func_write_resp(
 //     ngx_int_t num_of_apps;
 // } ngx_http_c_func_main_conf_t;
 
-typedef void (*ngx_http_c_func_app_handler)(ngx_http_c_func_request_t*);
-typedef void (*ngx_http_c_func_client_conf_fn)(void);
+typedef void (*ngx_http_c_func_app_handler)(ngx_http_c_func_ctx_t*);
+// typedef void (*ngx_http_c_func_client_conf_fn)(void);
 
 
 typedef struct {
@@ -100,7 +100,7 @@ typedef struct {
 typedef struct {
     unsigned done: 1;
     unsigned waiting_more_body: 1;
-} ngx_http_c_func_ctx_t;
+} ngx_http_c_func_internal_ctx_t;
 
 
 typedef struct {
@@ -252,7 +252,7 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle) {
     do {
         ngx_http_c_func_apps_t* app_lib = ngx_queue_data(q, ngx_http_c_func_apps_t, _queue);
 
-        ngx_http_c_func_client_conf_fn func;
+        ngx_http_c_func_app_handler func;
         if (app_lib->_app) {
             *(void**)(&func) = dlsym(app_lib->_app, (const char*)"ngx_http_c_func_init");
             if ((error = dlerror()) != NULL) {
@@ -261,7 +261,9 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle) {
             } else {
                 ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "apps initializing");
                 /*** Init the apps ***/
-                func();
+                ngx_http_c_func_ctx_t new_ctx; //config request
+                new_ctx.__log__ = &cycle->log;
+                func(&new_ctx);
             }
         }
     } while ( (q = q->next) != &c_func_apps_queue);
@@ -330,14 +332,16 @@ static void ngx_http_c_func_module_exit(ngx_cycle_t *cycle) {
         ngx_http_c_func_apps_t* app_lib = ngx_queue_data(q, ngx_http_c_func_apps_t, _queue);
 
 
-        ngx_http_c_func_client_conf_fn func;
+        ngx_http_c_func_app_handler func;
         if (app_lib->_app) {
             *(void**)(&func) = dlsym(app_lib->_app, (const char*)"ngx_http_c_func_exit");
             if ((error = dlerror()) != NULL) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error function call %s", error);
             } else {
-                ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "apps Exiting status ");
-                func();
+                ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
+                ngx_http_c_func_ctx_t new_ctx; //config request
+                new_ctx.__log__ = &cycle->log;
+                func(&new_ctx);
             }
         }
 
@@ -352,7 +356,6 @@ static void ngx_http_c_func_module_exit(ngx_cycle_t *cycle) {
     }
 
     // ngx_core_conf_t  *ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
-    ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "%s", "Exiting Module");
 }
 
 // static void *
@@ -469,25 +472,25 @@ ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 static ngx_int_t ngx_http_c_func_content_handler(ngx_http_request_t *r)
 {
     ngx_http_c_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
-    // ngx_http_c_func_ctx_t *ctx;
+    // ngx_http_c_func_internal_ctx_t *ctx;
     // ngx_int_t rc;
 
-    ngx_http_c_func_request_t new_request;
-    new_request.__r__ = r;
-    new_request.__log__ = &r->connection->log;
+    ngx_http_c_func_ctx_t new_ctx;
+    new_ctx.__r__ = r;
+    new_ctx.__log__ = &r->connection->log;
 
     /***Set to default incase link library does not return anything ***/
-    new_request.__rc__ = NGX_HTTP_INTERNAL_SERVER_ERROR;
+    new_ctx.__rc__ = NGX_HTTP_INTERNAL_SERVER_ERROR;
 
     if (r->args.len > 0) {
-        new_request.args = ngx_pcalloc(r->pool, r->args.len + 1);
-        if (new_request.args == NULL) {
+        new_ctx.req_args = ngx_pcalloc(r->pool, r->args.len + 1);
+        if (new_ctx.req_args == NULL) {
             ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "insufficient memory....");
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
-        ngx_memcpy(new_request.args, (char*)r->args.data, r->args.len);
+        ngx_memcpy(new_ctx.req_args, (char*)r->args.data, r->args.len);
     } else {
-        new_request.args = NULL;
+        new_ctx.req_args = NULL;
     }
 
     if (r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH)) {
@@ -554,7 +557,7 @@ REQUEST_BODY_DONE:
                 Size is %d\n \
                 Request body is %s", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri, len, buf);
 
-            new_request.body = buf;
+            new_ctx.req_body = buf;
         }
     } else { //if (!(r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH))) {
         if (ngx_http_discard_request_body(r) != NGX_OK) {
@@ -566,12 +569,12 @@ REQUEST_BODY_DONE:
                 args is %V\n \
                 extern is %V\n \
                 unparsed_uri is %V\n", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri);
-        new_request.body = NULL;
+        new_ctx.req_body = NULL;
     }
     // App Request layer
-    lcf->_handler(&new_request);
+    lcf->_handler(&new_ctx);
 
-    return new_request.__rc__;
+    return new_ctx.__rc__;
 } /* ngx_http_c_func_content_handler */
 
 
@@ -585,7 +588,7 @@ REQUEST_BODY_DONE:
  */
 static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r)
 {
-    ngx_http_c_func_ctx_t *ctx;
+    ngx_http_c_func_internal_ctx_t *ctx;
     ngx_int_t rc;
 
     if (r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH)) {
@@ -603,10 +606,10 @@ static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r)
         }
 
         /* calloc, has init with 0 value*/
-        ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_c_func_ctx_t));
+        ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_c_func_internal_ctx_t));
 
         if (ctx == NULL) {
-            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Insufficient Memory to create ngx_http_c_func_ctx_t");
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Insufficient Memory to create ngx_http_c_func_internal_ctx_t");
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
 
@@ -636,7 +639,7 @@ static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r)
 static void
 ngx_http_c_func_client_body_handler(ngx_http_request_t *r)
 {
-    ngx_http_c_func_ctx_t *ctx;
+    ngx_http_c_func_internal_ctx_t *ctx;
     ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
     ctx->done = 1;
 
@@ -651,17 +654,17 @@ ngx_http_c_func_client_body_handler(ngx_http_request_t *r)
 }
 
 /****** extern interface ********/
-void ngx_http_c_func_log_debug(ngx_http_c_func_request_t* req, const char* msg) {
-    ngx_log_error(NGX_LOG_DEBUG, *((ngx_log_t *)req->__log__), 0, "%s", msg);
+void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg) {
+    ngx_log_error(NGX_LOG_DEBUG, *((ngx_log_t *)ctx->__log__), 0, "%s", msg);
 }
-void ngx_http_c_func_log_info(ngx_http_c_func_request_t* req, const char* msg) {
-    ngx_log_error(NGX_LOG_INFO, *((ngx_log_t *)req->__log__), 0, "%s", msg);
+void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg) {
+    ngx_log_error(NGX_LOG_INFO, *((ngx_log_t *)ctx->__log__), 0, "%s", msg);
 }
-void ngx_http_c_func_log_warn(ngx_http_c_func_request_t* req, const char* msg) {
-    ngx_log_error(NGX_LOG_WARN, *((ngx_log_t *)req->__log__), 0, "%s", msg);
+void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg) {
+    ngx_log_error(NGX_LOG_WARN, *((ngx_log_t *)ctx->__log__), 0, "%s", msg);
 }
-void ngx_http_c_func_log_err(ngx_http_c_func_request_t* req, const char* msg) {
-    ngx_log_error(NGX_LOG_ERR, *((ngx_log_t *)req->__log__), 0, "%s", msg);
+void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg) {
+    ngx_log_error(NGX_LOG_ERR, *((ngx_log_t *)ctx->__log__), 0, "%s", msg);
 }
 
 static u_char*
@@ -676,8 +679,8 @@ ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len) {
 }
 
 u_char*
-ngx_http_c_func_get_header(ngx_http_c_func_request_t* req, const char*key) {
-    ngx_http_request_t *r = (ngx_http_request_t*)req->__r__;
+ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key) {
+    ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
     ngx_list_part_t *part = &r->headers_in.headers.part;
     ngx_table_elt_t *header = part->elts;
     unsigned int i;
@@ -709,10 +712,10 @@ int strpos(const char *haystack, const char *needle) {
 }
 
 void*
-ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key) {
-    ngx_http_request_t *r = (ngx_http_request_t*)req->__r__;
+ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key) {
+    ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
     int len, pos;
-    char *qs = req->args;
+    char *qs = ctx->req_args;
     if (key && *key && qs && *qs) {
         len = strlen(key);
         do {
@@ -735,17 +738,17 @@ ngx_http_c_func_get_query_param(ngx_http_c_func_request_t *req, const char *key)
     return NULL;
 }
 
-void* ngx_http_c_func_palloc(ngx_http_c_func_request_t* req, size_t size) {
-    return ngx_palloc( ((ngx_http_request_t*)req->__r__)->pool, size );
+void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size) {
+    return ngx_palloc( ((ngx_http_request_t*)ctx->__r__)->pool, size );
 }
 
-void* ngx_http_c_func_pcalloc(ngx_http_c_func_request_t* req, size_t size) {
-    return ngx_pcalloc( ((ngx_http_request_t*)req->__r__)->pool, size );
+void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size) {
+    return ngx_pcalloc( ((ngx_http_request_t*)ctx->__r__)->pool, size );
 }
 
 void
 ngx_http_c_func_write_resp(
-    ngx_http_c_func_request_t* req,
+    ngx_http_c_func_ctx_t *ctx,
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,
@@ -754,7 +757,7 @@ ngx_http_c_func_write_resp(
     ngx_int_t rc;
     ngx_chain_t out;
     size_t resp_content_len;
-    ngx_http_request_t *r = (ngx_http_request_t*)req->__r__;
+    ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
     /* Set the Content-Type header. */
     if (content_type) {
         r->headers_out.content_type.len = ngx_strlen(content_type);
@@ -811,6 +814,6 @@ ngx_http_c_func_write_resp(
     rc = ngx_http_output_filter(r, &out);
 
 NGX_HTTTP_C_FUNC_WRITE_DONE:
-    req->__rc__ = rc;
+    ctx->__rc__ = rc;
 }
 

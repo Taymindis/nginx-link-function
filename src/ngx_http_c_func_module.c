@@ -42,7 +42,10 @@
 
 static ngx_int_t ngx_http_c_func_pre_configuration(ngx_conf_t *cf);
 static ngx_int_t ngx_http_c_func_post_configuration(ngx_conf_t *cf);
-static char* ngx_http_c_func_set_str_slot_and_init_lib(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char* ngx_http_c_func_set_str_slot_and_add_queue(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *ngx_http_c_func_srv_post_conf_handler(ngx_conf_t *cf, void *data, void *conf);
+static void *ngx_http_c_func_create_main_conf(ngx_conf_t *cf);
+static char *ngx_http_c_func_init_main_conf(ngx_conf_t *cf, void *conf);
 static void * ngx_http_c_func_create_srv_conf(ngx_conf_t *cf);
 static char * ngx_http_c_func_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
 static void * ngx_http_c_func_create_loc_conf(ngx_conf_t *cf);
@@ -53,7 +56,7 @@ static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r);
 static void ngx_http_c_func_module_exit(ngx_cycle_t *cycle);
 static ngx_int_t ngx_http_c_func_module_init(ngx_cycle_t *cycle);
 static void ngx_http_c_func_client_body_handler(ngx_http_request_t *r);
-static void ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle);
+static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle);
 static u_char* ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len);
 
 
@@ -78,17 +81,15 @@ void ngx_http_c_func_write_resp(
 * Configs
 *
 */
-// typedef struct {
-//     ngx_flag_t is_enabled;
-//     ngx_int_t num_of_apps;
-// } ngx_http_c_func_main_conf_t;
+typedef struct {
+    ngx_queue_t *c_func_apps_queue;
+} ngx_http_c_func_main_conf_t;
 
 typedef void (*ngx_http_c_func_app_handler)(ngx_http_c_func_ctx_t*);
-// typedef void (*ngx_http_c_func_client_conf_fn)(void);
-
 
 typedef struct {
     void *_app;
+    // ngx_flag_t _has_lib_path;
     ngx_str_t _libname;
 } ngx_http_c_func_srv_conf_t;
 
@@ -105,12 +106,13 @@ typedef struct {
 
 typedef struct {
     ngx_queue_t _queue;
-    ngx_str_t _libname;
-    void* _app;
+    ngx_http_c_func_srv_conf_t* _app_srv_conf;
 } ngx_http_c_func_apps_t;
 
 
-static ngx_queue_t c_func_apps_queue;
+static ngx_conf_post_t ngx_http_c_func_srv_post_conf = {
+    ngx_http_c_func_srv_post_conf_handler
+};
 
 /**
  * This module provided directive.
@@ -120,10 +122,10 @@ static ngx_command_t ngx_http_c_func_commands[] = {
     {
         ngx_string("ngx_http_c_func_link_lib"),
         NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
-        ngx_http_c_func_set_str_slot_and_init_lib,
+        ngx_http_c_func_set_str_slot_and_add_queue,
         NGX_HTTP_SRV_CONF_OFFSET,
         offsetof(ngx_http_c_func_srv_conf_t, _libname),
-        NULL
+        &ngx_http_c_func_srv_post_conf
     },
     {   ngx_string("ngx_http_c_func_call"), /* directive */
         NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1, /* location context and takes
@@ -142,8 +144,8 @@ static ngx_http_module_t ngx_http_c_func_module_ctx = {
     ngx_http_c_func_pre_configuration, /* preconfiguration */
     ngx_http_c_func_post_configuration, /* postconfiguration */
 
-    NULL,//ngx_http_c_func_create_main_conf,  /* create main configuration */
-    NULL, /* init main configuration */
+    ngx_http_c_func_create_main_conf,  /* create main configuration */
+    ngx_http_c_func_init_main_conf, /* init main configuration */
 
     ngx_http_c_func_create_srv_conf, /* create server configuration */
     ngx_http_c_func_merge_srv_conf, /* merge server configuration */
@@ -168,39 +170,44 @@ ngx_module_t ngx_http_c_func_module = {
     NGX_MODULE_V1_PADDING
 };
 
-static char* ngx_http_c_func_set_str_slot_and_init_lib(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+static char* ngx_http_c_func_set_str_slot_and_add_queue(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     ngx_str_t                      *value;
     ngx_http_c_func_srv_conf_t *scf = conf;
-    // scf->has_init_app = 1; // Unsed at the moment
-    // if (!is_ngx_http_c_func_module_enabled) { // enabled it
-    //     is_ngx_http_c_func_module_enabled = !is_ngx_http_c_func_module_enabled;
-    // }
+
+    ngx_http_c_func_main_conf_t *mcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_c_func_module);
 
     value = cf->args->elts;
     if (value[1].len > 0) {
         ngx_http_c_func_apps_t *app_lib = ngx_pcalloc(cf->pool, sizeof(ngx_http_c_func_apps_t));
-        app_lib->_app = NULL;
+        app_lib->_app_srv_conf = scf;
+        ngx_queue_init(&app_lib->_queue);
+        ngx_queue_insert_tail(mcf->c_func_apps_queue, &app_lib->_queue);
 
-        app_lib->_app = scf->_app = dlopen((char*) value[1].data, RTLD_LAZY | RTLD_NOW);
-
-        if ( !scf->_app )  {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "unable to initialized the library ");
-            return NGX_CONF_ERROR;
-        } else {
-            app_lib->_libname.len = value[1].len;
-            app_lib->_libname.data = ngx_pstrdup(cf->pool , &value[1]);
-            ngx_queue_init(&app_lib->_queue);
-            ngx_queue_insert_tail(&c_func_apps_queue, &app_lib->_queue);
-
-            ngx_conf_log_error(NGX_LOG_INFO, cf, 0, "Apps %V loaded successfully ", &value[1]);
-        }
     } else {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "no library name sepecified ");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "no Application name sepecified ");
 
         return NGX_CONF_ERROR;
     }
     return ngx_conf_set_str_slot(cf, cmd, conf);
 }
+
+
+static char *ngx_http_c_func_srv_post_conf_handler(ngx_conf_t *cf, void *data, void *conf) {
+    ngx_str_t *value = conf;
+    ngx_http_c_func_srv_conf_t *scf  = ngx_http_conf_get_module_srv_conf(cf, ngx_http_c_func_module);
+
+    if (value->len > 0) {
+        scf->_app = dlopen((char*) value->data, RTLD_LAZY | RTLD_NOW);
+        if ( !scf->_app )  {
+            ngx_conf_log_error(NGX_LOG_ERR, cf,  0, "%s", "unable to initialized the library ");
+            return NGX_CONF_ERROR;
+        } else {
+            ngx_conf_log_error(NGX_LOG_INFO, cf, 0, "Apps %V loaded successfully ", value);
+        }
+    }
+
+    return NGX_CONF_OK;
+} /* ngx_http_c_func_init_method */
 
 /**
  * Configuration setup function that installs the content handler.
@@ -244,17 +251,34 @@ static char *ngx_http_c_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, voi
 } /* ngx_http_c_func_init_method */
 
 
-static void
+static ngx_int_t
 ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle) {
-    ngx_queue_t* q = ngx_queue_head(&c_func_apps_queue);
+    ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+    ngx_http_c_func_main_conf_t *mcf;
+    ngx_http_c_func_srv_conf_t *scf;
+    if (ctx == NULL) {
+        // No HTTP block in config
+        return NGX_OK;
+    }
+    mcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+
+    if (ngx_queue_empty(mcf->c_func_apps_queue) ) {
+        /*** No lib link needed ***/
+        return NGX_OK;
+    }
+
+    ngx_queue_t* q = ngx_queue_head(mcf->c_func_apps_queue);
     char *error;
 
     do {
         ngx_http_c_func_apps_t* app_lib = ngx_queue_data(q, ngx_http_c_func_apps_t, _queue);
 
+        scf = app_lib->_app_srv_conf;
+
+        /**** Init the client apps ngx_http_c_func_init ***/
         ngx_http_c_func_app_handler func;
-        if (app_lib->_app) {
-            *(void**)(&func) = dlsym(app_lib->_app, (const char*)"ngx_http_c_func_init");
+        if (scf->_app) {
+            *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_http_c_func_init");
             if ((error = dlerror()) != NULL) {
                 ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Error function call %s", error);
 
@@ -265,15 +289,18 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t *cycle) {
                 new_ctx.__log__ = cycle->log;
                 func(&new_ctx);
             }
-        }
-    } while ( (q = q->next) != &c_func_apps_queue);
+        } else { ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "unknown app initializing"); }
+    } while ( (q = q->next) != mcf->c_func_apps_queue);
 
     ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "%s", "Done proceed init calls");
+    return NGX_OK;
 
 }
 
 static ngx_int_t ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
-    if (! (ngx_queue_empty(&c_func_apps_queue)) ) {
+    ngx_http_c_func_main_conf_t *mcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_c_func_module);
+
+    if (mcf != NULL && ! (ngx_queue_empty(mcf->c_func_apps_queue)) ) {
         ngx_http_handler_pt        *h;
         ngx_http_core_main_conf_t  *cmcf;
 
@@ -301,85 +328,83 @@ ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_ERROR;
 #endif
 
-    ngx_queue_init(&c_func_apps_queue);
-
     return NGX_OK;
 }
 
 
 static ngx_int_t ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
-//     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
-//     ngx_http_c_func_main_conf_t *mcf;
-//     mcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
-
     // If any linked libs
-    if (! (ngx_queue_empty(&c_func_apps_queue)) ) {
-        ngx_http_c_func_proceed_init_calls(cycle);
-    }
-
-    return NGX_OK;
+    return ngx_http_c_func_proceed_init_calls(cycle);
 
 }
 
 static void ngx_http_c_func_module_exit(ngx_cycle_t *cycle) {
+    ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+    ngx_http_c_func_main_conf_t *mcf;
+    ngx_http_c_func_srv_conf_t *scf;
+    if (ctx == NULL) {
+        // No HTTP block in config
+        return;
+    }
+    mcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+
 
     /***TODO ****/
     // unload library
     // Free all the apps
     char *error;
-    while (! (ngx_queue_empty(&c_func_apps_queue)) )  {
-        ngx_queue_t* q = ngx_queue_head(&c_func_apps_queue);
+    while (! (ngx_queue_empty(mcf->c_func_apps_queue)) )  {
+        ngx_queue_t* q = ngx_queue_head(mcf->c_func_apps_queue);
         ngx_http_c_func_apps_t* app_lib = ngx_queue_data(q, ngx_http_c_func_apps_t, _queue);
 
+        scf = app_lib->_app_srv_conf;
 
+        /*** Exiting the client apps ***/
         ngx_http_c_func_app_handler func;
-        if (app_lib->_app) {
-            *(void**)(&func) = dlsym(app_lib->_app, (const char*)"ngx_http_c_func_exit");
+        if (scf->_app) {
+            *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_http_c_func_exit");
             if ((error = dlerror()) != NULL) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error function call %s", error);
             } else {
-                ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
                 ngx_http_c_func_ctx_t new_ctx; //config request
                 new_ctx.__log__ = cycle->log;
                 func(&new_ctx);
             }
         }
 
-
-        if (dlclose(app_lib->_app) != 0) {
-            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error to unload the app lib %V", &app_lib->_libname);
+        if (dlclose(scf->_app) != 0) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error to unload the app lib %V", &scf->_libname);
         } else {
-            ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Unloaded app lib %V", &app_lib->_libname);
+            ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Unloaded app lib %V", &scf->_libname);
         }
 
         ngx_queue_remove(q);
     }
+    ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
 
     // ngx_core_conf_t  *ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 }
 
-// static void *
-// ngx_http_c_func_create_main_conf(ngx_conf_t *cf) {
-//     ngx_http_c_func_main_conf_t *mcf;
-//     mcf = ngx_pcalloc(cf->pool, sizeof(ngx_http_c_func_main_conf_t));
-//     if (mcf == NULL) {
-//         return NGX_CONF_ERROR;
-//     }
-//     mcf->num_of_apps = NGX_CONF_UNSET;
-//     mcf->is_enabled = NGX_CONF_UNSET;
+static void *
+ngx_http_c_func_create_main_conf(ngx_conf_t *cf) {
+    ngx_http_c_func_main_conf_t *mcf;
+    mcf = ngx_pcalloc(cf->pool, sizeof(ngx_http_c_func_main_conf_t));
+    if (mcf == NULL) {
+        return NGX_CONF_ERROR;
+    }
+    mcf->c_func_apps_queue = ngx_pcalloc(cf->pool, sizeof(ngx_queue_t));
+    ngx_queue_init(mcf->c_func_apps_queue);
 
-//     return mcf;
-// }
+    return mcf;
+}
 
-// static char *
-// ngx_http_c_func_init_main_conf(ngx_conf_t *cf, void *conf)
-// {
+static char *
+ngx_http_c_func_init_main_conf(ngx_conf_t *cf, void *conf) {
+    return NGX_CONF_OK;
+}
 
-//     return NGX_CONF_OK;
-// }
-
-
-static void * ngx_http_c_func_create_srv_conf(ngx_conf_t *cf) {
+static void *
+ngx_http_c_func_create_srv_conf(ngx_conf_t *cf) {
     ngx_http_c_func_srv_conf_t *conf;
     conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_c_func_srv_conf_t));
     if (conf == NULL) {
@@ -402,7 +427,7 @@ ngx_http_c_func_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
 
     ngx_conf_merge_str_value(conf->_libname, prev->_libname, "");
-    // ngx_conf_merge_ptr_value(conf->exit_handler, prev->exit_handler, NULL);
+    // ngx_conf_merge_value(conf->_has_lib_path, prev->_has_lib_path, 0);
 
     // if (conf->_app == NULL) {
     //     conf->_app = prev->_app;

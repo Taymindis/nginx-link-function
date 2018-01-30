@@ -207,7 +207,7 @@ static char *ngx_http_c_func_srv_post_conf_handler(ngx_conf_t *cf, void *data, v
     }
 
     return NGX_CONF_OK;
-} /* ngx_http_c_func_init_method */
+} /* ngx_http_c_func_srv_post_conf_handler */
 
 /**
  * Configuration setup function that installs the content handler.

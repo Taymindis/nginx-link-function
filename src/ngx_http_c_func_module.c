@@ -583,6 +583,8 @@ REQUEST_BODY_DONE:
                 Request body is %s", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri, len, buf);
 
             new_ctx.req_body = buf;
+        } else {
+            new_ctx.req_body = NULL;
         }
     } else { //if (!(r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH))) {
         if (ngx_http_discard_request_body(r) != NGX_OK) {

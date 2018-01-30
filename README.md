@@ -199,11 +199,15 @@ Sample Application Development
 /*** gcc -shared -o libcfuntest.so -fPIC cfuntest.c ***/
 /*** cp libcfuntest.so /etc/nginx/ ***/
 
-int count = 99;
+int is_service_on = 0;
 
-void ngx_http_c_func_init() {
-    ++count;
+void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx) {
+    ngx_http_c_func_log(info, ctx, "%s", "Starting The Application");
+
+
+    is_service_on=1;
 }
+
 
 
 void my_app_simple_get_greeting(ngx_http_c_func_ctx_t *ctx) {
@@ -273,17 +277,30 @@ void my_app_simple_get_no_resp(ngx_http_c_func_ctx_t *ctx) {
 
 }
 
+void ngx_http_c_func_exit(ngx_http_c_func_ctx_t* ctx) {
+    ngx_http_c_func_log(info, ctx, "%s\n", "Shutting down The Application");
 
-void ngx_http_c_func_exit() {
-    ++count;
+    is_service_on = 0;
 }
 ```
 
 #### Noted: 
 The c-func init and exit are reserved function when started the nginx, it will call init method, when stop nginx, it will call exit function.
 ```c
-void ngx_http_c_func_init(){}
-void ngx_http_c_func_exit(){}
+void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx){}
+void ngx_http_c_func_exit(ngx_http_c_func_ctx_t* ctx){}
+```
+
+#### Log Level
+The log can be called, the logged message will be store where you config error log in nginx.conf
+```c
+ngx_http_c_func_log_info(ctx, "This is info direct message");
+ngx_http_c_func_log(info, ctx, "%s", "This is info with formatted message");
+ngx_http_c_func_log_debug(ctx, "This is debug direct message");
+ngx_http_c_func_log(debug, ctx, "%s", "This is debug with formatted message");
+
+ngx_http_c_func_log_info(ctx, "%s", "This is info with formatted message"); // Wrong format
+ngx_http_c_func_log_debug(ctx, "%s", "This is info with formatted message"); // Wrong format
 ```
 
 Test

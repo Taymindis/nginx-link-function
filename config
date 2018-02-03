@@ -39,6 +39,21 @@ ABSOLUTE_NGX_CFUNC_CURRENT_PATH="$( cd "$ngx_addon_dir" ; pwd -P )"
 sed -i "s@NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH@$ABSOLUTE_NGX_CFUNC_CURRENT_PATH/t@g" $ngx_addon_dir/t/sanity.t
 fi
 
+# with OPENSSL feature, NGX_SSL had done verification
+# ngx_feature="ngx_http_c_func_ssl"
+# ngx_feature_name="NGX_HAVE_HTTP_C_FUNC_SSL_HEADERS"
+# ngx_feature_run=no
+# ngx_feature_incs="#include <openssl/ssl.h> #include <openssl/x509_vfy.h> #include <openssl/conf.h>"
+# ngx_feature_path=
+# ngx_feature_libs="-lssl -lcrypto"
+# # ngx_feature_exit_if_not_found=yes
+# ngx_feature_test="SSL_CTX *ctx = SSL_CTX_new(SSLv23_client_method()); SSL *ssl = SSL_new(ctx);"
+# . auto/feature
+
+# if [ $ngx_found = yes ]; then
+# have=NGX_HTTP_C_FUN_SSL . auto/have
+# fi
+
 
 if test -n "$ngx_module_link"; then
     ngx_module_type=HTTP

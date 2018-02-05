@@ -56,6 +56,7 @@ typedef struct {
     void *_app;
     ngx_str_t _libname;
     ngx_str_t _downloadlink;
+    ngx_str_t _headers;
     ngx_str_t _ca_cart;
     ngx_queue_t *_c_func_locs_queue;
 } ngx_http_c_func_srv_conf_t;
@@ -106,9 +107,9 @@ typedef struct {
 static int ngx_http_c_fun_write_to_file(char* out_path, char* out_buff, size_t size, ngx_cycle_t *cycle);
 static int strpos(const char *haystack, const char *needle);
 static ngx_http_c_fun_http_header_body* convert_to_http_header_body(char* final_buf, int curr_size, ngx_cycle_t *cycle);
-static int ngx_http_c_fun_connect_and_request(int *sockfd, const char *const_url_str, ngx_cycle_t *cycle);
+static int ngx_http_c_fun_connect_and_request(int *sockfd, ngx_http_c_func_srv_conf_t* scf, ngx_cycle_t *cycle);
 static ngx_http_c_fun_http_header_body* ngx_http_c_fun_read_data_from_server(int *sockfd, ngx_cycle_t *cycle);
-static ngx_http_c_fun_http_header_body* ngx_http_c_fun_http_request( ngx_cycle_t *cycle, char *url_str, char* dest_file_path);
+static ngx_http_c_fun_http_header_body* ngx_http_c_fun_http_request( ngx_cycle_t *cycle, ngx_http_c_func_srv_conf_t* scf);
 #if (NGX_SSL || NGX_OPENSSL)
 static int ngx_http_c_fun_connect_and_request_via_ssl(int *sockfd, ngx_http_c_func_srv_conf_t* scf, SSL_CTX **ctx, SSL **ssl, ngx_cycle_t *cycle);
 static ngx_http_c_fun_http_header_body* ngx_http_c_fun_read_data_from_server_via_ssl(SSL *ssl, ngx_cycle_t *cycle);
@@ -151,7 +152,7 @@ static ngx_command_t ngx_http_c_func_commands[] = {
     },
     {
         ngx_string("ngx_http_c_func_download_and_link_lib"),
-        NGX_HTTP_SRV_CONF | NGX_CONF_TAKE2,
+        NGX_HTTP_SRV_CONF | NGX_CONF_TAKE23,
         ngx_http_c_func_validation_check_and_set_str_slot,
         NGX_HTTP_SRV_CONF_OFFSET,
         0,
@@ -216,45 +217,51 @@ ngx_http_c_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command_t 
 
     values = cf->args->elts;
 
-    if (values[1].len > 0 && values[2].len > 0) {
-        if (ngx_strncmp(values[1].data, "https://", 8) == 0) {
-            if (! mcf->is_ssl_support) {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "https is not support, please include openssl, alternatively, use http or use ngx_http_c_func_link_lib to direct link to your local file");
-                return NGX_CONF_ERROR;
-            } else {
+    if (cf->args->nelts == 3 ) {
+        if (values[1].len > 0 && values[2].len > 0) {
+            if (ngx_strncmp(values[1].data, "https://", 8) == 0) {
+                if (! mcf->is_ssl_support) {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "https is not support, please include openssl, alternatively, use http or use ngx_http_c_func_link_lib to direct link to your local file");
+                    return NGX_CONF_ERROR;
+                } else {
+                    scf->_downloadlink = values[1];
+                }
+            } else if (ngx_strncmp(values[1].data, "http://", 7) == 0) {
                 scf->_downloadlink = values[1];
+            } else {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Download link is invalid, only http or https is allowed, please use ngx_http_c_func_link_lib to direct link to your local file");
+                return NGX_CONF_ERROR;
             }
-        } else if (ngx_strncmp(values[1].data, "http://", 7) == 0) {
-            scf->_downloadlink = values[1];
+
         } else {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Download link is invalid, only http or https is allowed, please use ngx_http_c_func_link_lib to direct link to your local file");
+            ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Download link or destination path is empty");
             return NGX_CONF_ERROR;
         }
-
-    } else {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Download link or destination path is empty");
-        return NGX_CONF_ERROR;
+        scf->_libname = values[2];
+    } else if (cf->args->nelts == 4 ) { // extra headers
+        if (values[1].len > 0 && values[2].len > 0 && values[3].len > 0) {
+            if (ngx_strncmp(values[1].data, "https://", 8) == 0) {
+                if (! mcf->is_ssl_support) {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "https is not support, please include openssl, alternatively, use http or use ngx_http_c_func_link_lib to direct link to your local file");
+                    return NGX_CONF_ERROR;
+                } else {
+                    scf->_downloadlink = values[1];
+                    scf->_headers = values[2];
+                }
+            } else if (ngx_strncmp(values[1].data, "http://", 7) == 0) {
+                scf->_downloadlink = values[1];
+                scf->_headers = values[2];
+            } else {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Download link is invalid, only http or https is allowed, please use ngx_http_c_func_link_lib to direct link to your local file");
+                return NGX_CONF_ERROR;
+            }
+        } else {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Download link, headers or destination path is empty, if you don't need headers, please specify with 2 parameter only");
+            return NGX_CONF_ERROR;
+        }
+        scf->_libname = values[3];
     }
-
-    scf->_libname = values[2];
     mcf->is_module_enabled = 1;
-    // if (values[2].len > 0) {
-    //     ngx_http_c_func_srv_q_t *app_lib = ngx_pcalloc(cf->pool, sizeof(ngx_http_c_func_srv_q_t));
-    //     app_lib->_app_srv_conf = scf;
-    //     ngx_queue_init(&app_lib->_queue);
-    //     ngx_queue_insert_tail(mcf->c_func_apps_queue, &app_lib->_queue);
-
-    //     scf->_app = dlopen((char*) values[2].data, RTLD_LAZY | RTLD_NOW);
-    //     if ( !scf->_app )  {
-    //         ngx_conf_log_error(NGX_LOG_ERR, cf,  0, "%s", "unable to initialized the library ");
-    //         return NGX_CONF_ERROR;
-    //     } else {
-    //         ngx_conf_log_error(NGX_LOG_INFO, cf, 0, "Apps %V loaded successfully ", &values[2]);
-    //     }
-    // } else {
-    //     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "no Application name sepecified ");
-    //     return NGX_CONF_ERROR;
-    // }
 
     return NGX_CONF_OK;
 }
@@ -391,7 +398,7 @@ ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
                     ngx_http_c_fun_https_request(cycle, scf);
 #endif
                 } else if (ngx_strncmp(scf->_downloadlink.data, "http://", 7) == 0) {
-                    ngx_http_c_fun_http_request( cycle, (char*)scf->_downloadlink.data, (char*)scf->_libname.data);
+                    ngx_http_c_fun_http_request( cycle, scf);
                 }
             }
 
@@ -999,9 +1006,9 @@ convert_to_http_header_body(char* final_buf, int curr_size, ngx_cycle_t *cycle) 
 #define NGX_C_FUNC_DFT_DOWNLOAD_BYTESIZE 1024
 
 static int
-ngx_http_c_fun_connect_and_request(int *sockfd, const char *const_url_str, ngx_cycle_t *cycle) {
+ngx_http_c_fun_connect_and_request(int *sockfd, ngx_http_c_func_srv_conf_t* scf, ngx_cycle_t *cycle) {
     int rc;
-
+    const char* const_url_str = (const char*) scf->_downloadlink.data;
     /**  break down parsing **/
     size_t const_url_str_len = ngx_strlen(const_url_str);
     char* url_str = ngx_pcalloc(cycle->pool, ( const_url_str_len * sizeof(char)) + 1);
@@ -1063,11 +1070,15 @@ ngx_http_c_fun_connect_and_request(int *sockfd, const char *const_url_str, ngx_c
     }
     rc = 1;
 
-    len_of_data_msg = ngx_strlen(hostname) + 5/*Port number size*/ + ngx_strlen(path) + 80 /**Default header size**/;
+    len_of_data_msg = ngx_strlen(hostname) + 5/*Port number size*/ + ngx_strlen(path) + 101 /**Default header size**/ + scf->_headers.len;
     u_char *data_to_send = ngx_pcalloc(cycle->pool, len_of_data_msg * sizeof(u_char));
-    ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
-                 "GET /%s HTTP/1.0\r\nHost: %s:%d\r\nCache-Control: no-cache\r\n\r\n", path, hostname, port);
-
+    if (scf->_headers.len > 0) {
+        ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
+                     "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n%s\r\n\r\n", path, hostname, port, scf->_headers.data);
+    } else {
+        ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
+                     "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n\r\n", path, hostname, port);
+    }
     struct timeval timeout;
     timeout.tv_sec = 5;
     timeout.tv_usec = 0;
@@ -1130,13 +1141,13 @@ ngx_http_c_fun_read_data_from_server(int *sockfd, ngx_cycle_t *cycle) {
 }
 
 static ngx_http_c_fun_http_header_body*
-ngx_http_c_fun_http_request(ngx_cycle_t *cycle, char *url_str,  char* dest_file_path) {
+ngx_http_c_fun_http_request(ngx_cycle_t *cycle, ngx_http_c_func_srv_conf_t* scf) {
     int sockfd;
     ngx_http_c_fun_http_header_body* hhb = NULL;
-    if (ngx_http_c_fun_connect_and_request(&sockfd, url_str, cycle)) {
+    if (ngx_http_c_fun_connect_and_request(&sockfd, scf , cycle)) {
         hhb = ngx_http_c_fun_read_data_from_server(&sockfd, cycle);
         if (hhb) {
-            ngx_http_c_fun_write_to_file(dest_file_path, hhb->body_content, hhb->body_len, cycle);
+            ngx_http_c_fun_write_to_file( (char*) scf->_libname.data, hhb->body_content, hhb->body_len, cycle);
             ngx_pfree(cycle->pool, hhb->header_content);
             ngx_pfree(cycle->pool, hhb->body_content);
             ngx_pfree(cycle->pool, hhb);
@@ -1233,8 +1244,8 @@ ngx_http_c_fun_connect_and_request_via_ssl(int *sockfd, ngx_http_c_func_srv_conf
 
     /*** ca cert verification ***/
     if (scf->_ca_cart.len > 0) {
-        if(SSL_CTX_load_verify_locations(*ctx,(const char*) scf->_ca_cart.data, NULL) == 0) {
-         ngx_log_error(NGX_LOG_WARN, cycle->log,  0, "failed to read ca cert");
+        if (SSL_CTX_load_verify_locations(*ctx, (const char*) scf->_ca_cart.data, NULL) == 0) {
+            ngx_log_error(NGX_LOG_WARN, cycle->log,  0, "failed to read ca cert");
         }
 
         SSL_set_verify(*ssl, SSL_VERIFY_PEER, NULL);
@@ -1260,11 +1271,17 @@ ngx_http_c_fun_connect_and_request_via_ssl(int *sockfd, ngx_http_c_func_srv_conf
         ngx_log_error(NGX_LOG_DEBUG, cycle->log,  0, "SSL/TLS session is enabled: %s", url_str);
         int r, request_len;
 
-        /* Now construct our HTTP request */
-        len_of_data_msg = ngx_strlen(hostname) + 5/*Port number size*/ + ngx_strlen(path) + 80 /**Default header size**/;
+        /** Now construct our HTTP request, if using http/1.1 please specified Connection: Close to prevent keep-alive issue **/
+        len_of_data_msg = ngx_strlen(hostname) + 5/*Port number size*/ + ngx_strlen(path) + 101 /**Default header size**/ + scf->_headers.len;
         u_char *data_to_send = ngx_pcalloc(cycle->pool, len_of_data_msg * sizeof(u_char));
-        ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
-                     "GET /%s HTTP/1.0\r\nHost: %s:%d\r\nCache-Control: no-cache\r\n\r\n", path, hostname, port);
+        if (scf->_headers.len > 0) {
+            ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
+                         "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n%s\r\n\r\n", path, hostname, port, scf->_headers.data);
+        } else {
+            ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
+                         "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n\r\n", path, hostname, port);
+        }
+        
         request_len = ngx_strlen(data_to_send);
         r = SSL_write(*ssl, data_to_send, request_len);
         switch (SSL_get_error(*ssl, r)) {

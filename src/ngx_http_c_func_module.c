@@ -337,7 +337,7 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf
         ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error function call %s", error);
 
     } else {
-        ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "appplication initializing");
+        ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "application initializing");
         /*** Init the apps ***/
         ngx_http_c_func_ctx_t new_ctx; //config request
         new_ctx.__log__ = cycle->log;

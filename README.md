@@ -81,7 +81,7 @@ server {
       if ( $request_method !~ ^(POST)$ ) {
         return 405;
       }
-      ngx_http_c_func_call "my_2nd_app_simple_get_token";
+      ngx_http_c_func_call "my_3rd_app_simple_get_token";
   }
 }
 
@@ -97,7 +97,7 @@ server {
       if ( $request_method !~ ^(POST)$ ) {
         return 405;
       }
-      ngx_http_c_func_call "my_2nd_app_simple_get_token";
+      ngx_http_c_func_call "my_other_app_simple_get_token";
   }
 }
 ```

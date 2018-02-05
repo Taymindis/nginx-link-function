@@ -145,7 +145,7 @@ static ngx_command_t ngx_http_c_func_commands[] = {
     {
         ngx_string("ngx_http_c_func_link_lib"),
         NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
-        ngx_conf_set_str_slot,
+        ngx_http_c_func_validation_check_and_set_str_slot,
         NGX_HTTP_SRV_CONF_OFFSET,
         offsetof(ngx_http_c_func_srv_conf_t, _libname),
         NULL//&ngx_http_c_func_srv_post_conf
@@ -217,7 +217,13 @@ ngx_http_c_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command_t 
 
     values = cf->args->elts;
 
-    if (cf->args->nelts == 3 ) {
+    if (cf->args->nelts == 2 ) {
+        if (values[1].len == 0 ) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Location link path is empty");
+            return NGX_CONF_ERROR;
+        }
+        scf->_libname = values[1];
+    } else if (cf->args->nelts == 3 ) {
         if (values[1].len > 0 && values[2].len > 0) {
             if (ngx_strncmp(values[1].data, "https://", 8) == 0) {
                 if (! mcf->is_ssl_support) {
@@ -261,7 +267,9 @@ ngx_http_c_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command_t 
         }
         scf->_libname = values[3];
     }
+
     mcf->is_module_enabled = 1;
+
 
     return NGX_CONF_OK;
 }
@@ -1281,7 +1289,7 @@ ngx_http_c_fun_connect_and_request_via_ssl(int *sockfd, ngx_http_c_func_srv_conf
             ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
                          "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n\r\n", path, hostname, port);
         }
-        
+
         request_len = ngx_strlen(data_to_send);
         r = SSL_write(*ssl, data_to_send, request_len);
         switch (SSL_get_error(*ssl, r)) {

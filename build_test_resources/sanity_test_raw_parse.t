@@ -41,9 +41,6 @@ Content-Type: text/plain
 qr/greeting=hello_nginx\?id=129310923$/
 
 
-
-
-
 === TEST 3: Set C_FUNC_TEST_POST_NONE
 --- config
 ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
@@ -102,3 +99,18 @@ Content-Type: text/plain
 --- response_body_like eval
 qr/This is the message calloc from pool$/
 
+
+=== TEST 7: Set C_FUNC_TEST_POST_BODY
+--- config
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFunPOSTBody {
+    ngx_http_c_func_call "my_app_simple_post";
+}
+--- request
+POST /testCFunPOSTBody
+greeting=enjoy-http-c-function-testing
+--- error_code: 202
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/greeting=enjoy-http-c-function-testing$/

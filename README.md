@@ -335,6 +335,19 @@ ngx_http_c_func_log_info(ctx, "%s", "This is info with formatted message"); // W
 ngx_http_c_func_log_debug(ctx, "%s", "This is info with formatted message"); // Wrong format
 ```
 
+### provide ca-cert to download your app(.so)?? please embedded this in your nginx.conf's server context.
+```c
+ngx_http_c_func_ca_cert "/etc/ssl/certs/ca-cert.crt"
+ngx_http_c_func_download_and_link_lib "https://abc.com/repos/libcfuntest.so" "/etc/nginx/libcfuntest4.so"
+```
+
+### provide ca-cert and extra header to download your app(.so)?? please embedded this in your nginx.conf's server context.
+```c
+ngx_http_c_func_ca_cert "/etc/ssl/certs/ca-cert.crt"
+ngx_http_c_func_download_and_link_lib "https://abc.com/repos/libcfuntest.so" "Accept-Language:en_US\r\nAuthorization:Bearer KA.eyJ2ZXJzaadlasdlaldhjHJ2h3ldjklsjaklcjkljasdklcmasaskdaJxdkL3ftjM\r\n" "/etc/nginx/libcfuntest4.so"
+
+```
+
 Test
 =====
 

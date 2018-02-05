@@ -68,6 +68,38 @@ server {
       ngx_http_c_func_call "my_2nd_app_simple_get_token";
   }
 }
+
+server {
+  listen 9888;
+  ...
+  ## Download application from cloud repo e.g. ngx_http_c_func_download_and_link_lib <download_link> <dest_link_file>
+  ngx_http_c_func_download_and_link_lib "http://10.2.110.203:8998/libcfuntest.so" "/etc/nginx/libcfuntest3.so"
+  ...
+  ...
+  location = /testPost {
+      add_header Allow "GET, POST, HEAD" always;
+      if ( $request_method !~ ^(POST)$ ) {
+        return 405;
+      }
+      ngx_http_c_func_call "my_2nd_app_simple_get_token";
+  }
+}
+
+server {
+  listen 9898;
+  ...
+  ## Download application from cloud repo with extra header e.g. ngx_http_c_func_download_and_link_lib <download_link> <headers> <dest_link_file>
+  ngx_http_c_func_download_and_link_lib "https://10.2.110.203:8998/libcfuntest.so" "Accept-Language:en_US\r\nAuthorization:Bearer KA.eyJ2ZXJzaW9uIjoyLCJpZCI6IldVVGU0RzhLVHJpVXhRLys5djROWmc9PSIsImV4cGlyZXNfYXQiOjE1MjAwNDQ2ODksInBpcGVsaW5lX2tleV9pZCI6Ik1RPT0iLCJwaXBlbGluZV9pZCI6MX0.r1Le43wxUjKiAHz2pxFT7ntYkynXy4zj6JxdkL3ftjM\r\n" "/etc/nginx/libcfuntest4.so"
+  ...
+  ...
+  location = /testPost {
+      add_header Allow "GET, POST, HEAD" always;
+      if ( $request_method !~ ^(POST)$ ) {
+        return 405;
+      }
+      ngx_http_c_func_call "my_2nd_app_simple_get_token";
+  }
+}
 ```
 
 

@@ -96,6 +96,7 @@ static ngx_int_t ngx_http_c_func_content_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_process_init(ngx_cycle_t *cycle);
 static void ngx_http_c_func_process_exit(ngx_cycle_t *cycle);
+static void ngx_http_c_func_master_exit(ngx_cycle_t *cycle);
 static void ngx_http_c_func_client_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle, ngx_http_c_func_srv_conf_t *scf);
 static u_char* ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len);
@@ -208,7 +209,7 @@ ngx_module_t ngx_http_c_func_module = {
     NULL, /* init thread */
     NULL, /* exit thread */
     ngx_http_c_func_process_exit, /* exit process */
-    NULL, /* exit master */
+    ngx_http_c_func_master_exit, /* exit master */
     NGX_MODULE_V1_PADDING
 };
 
@@ -508,7 +509,7 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
     cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
 
     if (cfunmcf == NULL) {
-        ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "Error when init process");
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error when exit process");
         return;
     }
     /***Make it run on one of the worker ***/
@@ -554,6 +555,25 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
     ngx_unlock(cfunmcf->multi_core_lock);
     ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
     // ngx_core_conf_t  *ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+}
+
+static void
+ngx_http_c_func_master_exit(ngx_cycle_t *cycle) {
+
+    ngx_http_c_func_main_conf_t *cfunmcf;
+    ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+
+    cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+
+    if (cfunmcf == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error when master exit");
+        return;
+    }
+
+    munmap((void*)cfunmcf->multi_core_lock, sizeof(*(cfunmcf->multi_core_lock)));
+    munmap((void*)cfunmcf->process_meta_status, sizeof(*(cfunmcf->process_meta_status)));
+    
+    ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
 }
 
 static void *

@@ -39,6 +39,8 @@
 
 
 #define MODULE_NAME "ngx_c_function"
+#define HAS_INIT_PROCESS_META_DONE 24
+#define HAS_EXIT_PROCESS_META_DONE 25
 
 /****
 *
@@ -48,6 +50,8 @@
 typedef struct {
     ngx_flag_t is_ssl_support;
     ngx_flag_t is_module_enabled;
+    ngx_atomic_t *multi_core_lock;
+    int *process_meta_status;
 } ngx_http_c_func_main_conf_t;
 
 typedef void (*ngx_http_c_func_app_handler)(ngx_http_c_func_ctx_t*);
@@ -90,8 +94,8 @@ static char * ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void 
 static char *ngx_http_c_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_c_func_content_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r);
-static void ngx_http_c_func_module_exit(ngx_cycle_t *cycle);
-static ngx_int_t ngx_http_c_func_module_init(ngx_cycle_t *cycle);
+static ngx_int_t ngx_http_c_func_process_init(ngx_cycle_t *cycle);
+static void ngx_http_c_func_process_exit(ngx_cycle_t *cycle);
 static void ngx_http_c_func_client_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle, ngx_http_c_func_srv_conf_t *scf);
 static u_char* ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len);
@@ -199,12 +203,12 @@ ngx_module_t ngx_http_c_func_module = {
     ngx_http_c_func_commands, /* module directives */
     NGX_HTTP_MODULE, /* module type */
     NULL, /* init master */
-    ngx_http_c_func_module_init, /* init module */
-    NULL, /* init process */
+    NULL, /* init module */
+    ngx_http_c_func_process_init, /* init process */
     NULL, /* init thread */
     NULL, /* exit thread */
-    NULL, /* exit process */
-    ngx_http_c_func_module_exit, /* exit master */
+    ngx_http_c_func_process_exit, /* exit process */
+    NULL, /* exit master */
     NGX_MODULE_V1_PADDING
 };
 
@@ -384,12 +388,32 @@ ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
 
 static ngx_int_t
-ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
+ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
+    ngx_int_t rc;
     ngx_uint_t s;
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_core_srv_conf_t **cscfp;
     ngx_http_core_main_conf_t *cmcf;
+    ngx_http_c_func_main_conf_t *cfunmcf;
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+
+    cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+
+    if (cfunmcf == NULL) {
+        ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "Error when init process");
+        return NGX_ERROR;
+    }
+    /***Make it run on one of the worker ***/
+    ngx_spinlock(cfunmcf->multi_core_lock, 1, 2048);
+
+    /***We only accept one worker to run the process*/
+    if (*cfunmcf->process_meta_status == HAS_INIT_PROCESS_META_DONE) {
+        rc = NGX_OK;
+        goto NGX_CFUNC_PROCESS_DONE;
+    }
+
+    *cfunmcf->process_meta_status = HAS_INIT_PROCESS_META_DONE;
+
 
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
     cscfp = cmcf->servers.elts;
@@ -413,7 +437,8 @@ ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
             scf->_app = dlopen((char*) scf->_libname.data, RTLD_LAZY | RTLD_NOW);
             if ( !scf->_app )  {
                 ngx_log_error(NGX_LOG_ERR, cycle->log,  0, "%s", "unable to initialized the Application ");
-                return NGX_ERROR;
+                rc = NGX_ERROR;
+                goto NGX_CFUNC_PROCESS_DONE;
             } else {
                 ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Application %V loaded successfully ", &scf->_libname);
             }
@@ -428,11 +453,13 @@ ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
                     *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
                     if ((error = dlerror()) != NULL) {
                         ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Error function load: %s", error);
-                        return NGX_ERROR;
+                        rc = NGX_ERROR;
+                        goto NGX_CFUNC_PROCESS_DONE;
                     }
                 } else {
                     ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "%s", "Ambiguous function name");
-                    return NGX_ERROR;
+                    rc = NGX_ERROR;
+                    goto NGX_CFUNC_PROCESS_DONE;
                 }
                 ngx_queue_remove(q);
             }
@@ -461,16 +488,39 @@ ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
             continue;
         }
     }
-    return NGX_OK;
+    rc = NGX_OK;
+NGX_CFUNC_PROCESS_DONE:
+
+    ngx_unlock(cfunmcf->multi_core_lock);
+
+    return rc;
 }
 
 static void
-ngx_http_c_func_module_exit(ngx_cycle_t *cycle) {
+ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
     ngx_uint_t s;
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_core_srv_conf_t **cscfp;
     ngx_http_core_main_conf_t *cmcf;
+    ngx_http_c_func_main_conf_t *cfunmcf;
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+
+    cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+
+    if (cfunmcf == NULL) {
+        ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "Error when init process");
+        return;
+    }
+    /***Make it run on one of the worker ***/
+    ngx_spinlock(cfunmcf->multi_core_lock, 1, 2048);
+
+    /***We only accept one worker to run the process*/
+    if (*cfunmcf->process_meta_status == HAS_EXIT_PROCESS_META_DONE) {
+        ngx_unlock(cfunmcf->multi_core_lock);
+        return;
+    }
+
+    *cfunmcf->process_meta_status = HAS_EXIT_PROCESS_META_DONE;
 
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
     cscfp = cmcf->servers.elts;
@@ -500,6 +550,8 @@ ngx_http_c_func_module_exit(ngx_cycle_t *cycle) {
             continue;
         }
     }
+
+    ngx_unlock(cfunmcf->multi_core_lock);
     ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
     // ngx_core_conf_t  *ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 }
@@ -519,6 +571,15 @@ ngx_http_c_func_create_main_conf(ngx_conf_t *cf) {
 #else
     mcf->is_ssl_support = 0;
 #endif
+
+    /*TODO either multi core safe or not , set it lock*/
+    mcf->multi_core_lock = mmap(NULL, sizeof(*(mcf->multi_core_lock)), PROT_READ | PROT_WRITE,
+                                MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    mcf->process_meta_status = mmap(NULL, sizeof(*(mcf->process_meta_status)), PROT_READ | PROT_WRITE,
+                                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    *mcf->multi_core_lock = 0;
+    *mcf->process_meta_status = 0;
+
     return mcf;
 }
 

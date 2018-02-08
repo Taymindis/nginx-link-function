@@ -552,9 +552,7 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
         }
     }
 
-    ngx_unlock(cfunmcf->multi_core_lock);
-    ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
-    // ngx_core_conf_t  *ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+    ngx_unlock(cfunmcf->multi_core_lock);    
 }
 
 static void

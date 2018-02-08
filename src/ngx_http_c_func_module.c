@@ -96,6 +96,7 @@ static ngx_int_t ngx_http_c_func_content_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_process_init(ngx_cycle_t *cycle);
 static void ngx_http_c_func_process_exit(ngx_cycle_t *cycle);
+static ngx_int_t ngx_http_c_func_module_init(ngx_cycle_t *cycle);
 static void ngx_http_c_func_master_exit(ngx_cycle_t *cycle);
 static void ngx_http_c_func_client_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle, ngx_http_c_func_srv_conf_t *scf);
@@ -204,7 +205,7 @@ ngx_module_t ngx_http_c_func_module = {
     ngx_http_c_func_commands, /* module directives */
     NGX_HTTP_MODULE, /* module type */
     NULL, /* init master */
-    NULL, /* init module */
+    ngx_http_c_func_module_init, /* init module */
     ngx_http_c_func_process_init, /* init process */
     NULL, /* init thread */
     NULL, /* exit thread */
@@ -389,32 +390,12 @@ ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
 
 static ngx_int_t
-ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
-    ngx_int_t rc;
+ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
     ngx_uint_t s;
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_core_srv_conf_t **cscfp;
     ngx_http_core_main_conf_t *cmcf;
-    ngx_http_c_func_main_conf_t *cfunmcf;
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
-
-    cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
-
-    if (cfunmcf == NULL) {
-        ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "Error when init process");
-        return NGX_ERROR;
-    }
-    /***Make it run on one of the worker ***/
-    ngx_spinlock(cfunmcf->multi_core_lock, 1, 2048);
-
-    /***We only accept one worker to run the process*/
-    if (*cfunmcf->process_meta_status == HAS_INIT_PROCESS_META_DONE) {
-        rc = NGX_OK;
-        goto NGX_CFUNC_PROCESS_DONE;
-    }
-
-    *cfunmcf->process_meta_status = HAS_INIT_PROCESS_META_DONE;
-
 
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
     cscfp = cmcf->servers.elts;
@@ -438,8 +419,7 @@ ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
             scf->_app = dlopen((char*) scf->_libname.data, RTLD_LAZY | RTLD_NOW);
             if ( !scf->_app )  {
                 ngx_log_error(NGX_LOG_ERR, cycle->log,  0, "%s", "unable to initialized the Application ");
-                rc = NGX_ERROR;
-                goto NGX_CFUNC_PROCESS_DONE;
+                return NGX_ERROR;
             } else {
                 ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Application %V loaded successfully ", &scf->_libname);
             }
@@ -454,13 +434,11 @@ ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
                     *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
                     if ((error = dlerror()) != NULL) {
                         ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Error function load: %s", error);
-                        rc = NGX_ERROR;
-                        goto NGX_CFUNC_PROCESS_DONE;
+                        return NGX_ERROR;
                     }
                 } else {
                     ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "%s", "Ambiguous function name");
-                    rc = NGX_ERROR;
-                    goto NGX_CFUNC_PROCESS_DONE;
+                    return NGX_ERROR;
                 }
                 ngx_queue_remove(q);
             }
@@ -483,15 +461,59 @@ ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
             //         return NGX_ERROR;
             //     }
             // }
+        } else {
+            continue;
+        }
+    }
+    return NGX_OK;
+}
 
+
+static ngx_int_t
+ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
+    ngx_int_t rc;
+    ngx_uint_t s;
+    ngx_http_c_func_srv_conf_t *scf;
+    ngx_http_core_srv_conf_t **cscfp;
+    ngx_http_core_main_conf_t *cmcf;
+    ngx_http_c_func_main_conf_t *cfunmcf;
+    ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+
+    cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+
+    if (cfunmcf == NULL) {
+        ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "Error when init process");
+        return NGX_ERROR;
+    }
+
+    /***Make it run on one of the worker ***/
+    ngx_spinlock(cfunmcf->multi_core_lock, 1, 2048);
+
+    /***We only accept one worker to run the process*/
+    if (*cfunmcf->process_meta_status == HAS_INIT_PROCESS_META_DONE) {
+        rc = NGX_OK;
+        goto NGX_CFUNC_PROCESS_DONE;
+    }
+
+    cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
+    cscfp = cmcf->servers.elts;
+
+    for (s = 0; s < cmcf->servers.nelts; s++) {
+        ngx_http_core_srv_conf_t *cscf = cscfp[s];
+        scf = cscf->ctx->srv_conf[ngx_http_c_func_module.ctx_index];
+        if (scf && scf->_libname.len > 0 ) {
+            /**Proceed init call for each server**/
             ngx_http_c_func_proceed_init_calls(cycle, scf);
         } else {
             continue;
         }
     }
-    rc = NGX_OK;
-NGX_CFUNC_PROCESS_DONE:
 
+    *cfunmcf->process_meta_status = HAS_INIT_PROCESS_META_DONE;
+
+    rc = NGX_OK;
+
+NGX_CFUNC_PROCESS_DONE:
     ngx_unlock(cfunmcf->multi_core_lock);
 
     return rc;
@@ -521,8 +543,6 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
         return;
     }
 
-    *cfunmcf->process_meta_status = HAS_EXIT_PROCESS_META_DONE;
-
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
     cscfp = cmcf->servers.elts;
 
@@ -541,25 +561,42 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
                 new_ctx.__log__ = cycle->log;
                 func(&new_ctx);
             }
-
-            if (dlclose(scf->_app) != 0) {
-                ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error to unload the app lib %V", &scf->_libname);
-            } else {
-                ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Unloaded app lib %V", &scf->_libname);
-            }
         } else {
             continue;
         }
     }
 
-    ngx_unlock(cfunmcf->multi_core_lock);    
+    *cfunmcf->process_meta_status = HAS_EXIT_PROCESS_META_DONE;
+
+    ngx_unlock(cfunmcf->multi_core_lock);
 }
 
 static void
 ngx_http_c_func_master_exit(ngx_cycle_t *cycle) {
-
+    ngx_uint_t s;
+    ngx_http_c_func_srv_conf_t *scf;
+    ngx_http_core_srv_conf_t **cscfp;
+    ngx_http_core_main_conf_t *cmcf;
     ngx_http_c_func_main_conf_t *cfunmcf;
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+
+    cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
+    cscfp = cmcf->servers.elts;
+
+    for (s = 0; s < cmcf->servers.nelts; s++) {
+        ngx_http_core_srv_conf_t *cscf = cscfp[s];
+        scf = cscf->ctx->srv_conf[ngx_http_c_func_module.ctx_index];
+        if (scf && scf->_app ) {
+            if (dlclose(scf->_app) != 0) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error to unload the app lib %V", &scf->_libname);
+            } else {
+                ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Unloaded app lib %V", &scf->_libname);
+            }
+
+        } else {
+            continue;
+        }
+    }
 
     cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
 
@@ -570,7 +607,7 @@ ngx_http_c_func_master_exit(ngx_cycle_t *cycle) {
 
     munmap((void*)cfunmcf->multi_core_lock, sizeof(*(cfunmcf->multi_core_lock)));
     munmap((void*)cfunmcf->process_meta_status, sizeof(*(cfunmcf->process_meta_status)));
-    
+
     ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
 }
 

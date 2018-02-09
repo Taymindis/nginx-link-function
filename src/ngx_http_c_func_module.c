@@ -472,6 +472,12 @@ ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_core_srv_conf_t **cscfp;
     ngx_http_core_main_conf_t *cmcf;
+
+    /** Only initialize when it is NGINX Worker or Single **/
+    if (ngx_process != NGX_PROCESS_WORKER && ngx_process != NGX_PROCESS_SINGLE) {
+        return NGX_OK;
+    }
+
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
 
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];

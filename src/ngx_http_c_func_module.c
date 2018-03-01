@@ -48,6 +48,7 @@
 typedef struct {
     ngx_flag_t is_ssl_support;
     ngx_flag_t is_module_enabled;
+    ngx_atomic_t *multi_processes_lock;
 } ngx_http_c_func_main_conf_t;
 
 typedef void (*ngx_http_c_func_app_handler)(ngx_http_c_func_ctx_t*);
@@ -95,7 +96,7 @@ static void ngx_http_c_func_process_exit(ngx_cycle_t *cycle);
 static ngx_int_t ngx_http_c_func_module_init(ngx_cycle_t *cycle);
 static void ngx_http_c_func_master_exit(ngx_cycle_t *cycle);
 static void ngx_http_c_func_client_body_handler(ngx_http_request_t *r);
-static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle, ngx_http_c_func_srv_conf_t *scf);
+static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf_t *scf, ngx_http_c_func_main_conf_t* mcf);
 static u_char* ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len);
 
 /*** Download Feature Support ***/
@@ -128,6 +129,10 @@ u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key);
 void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
 void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+
+void ngx_http_c_func_process_lock(ngx_http_c_func_ctx_t *ctx);
+void ngx_http_c_func_process_unlock(ngx_http_c_func_ctx_t *ctx);
+
 void ngx_http_c_func_write_resp(
     ngx_http_c_func_ctx_t *ctx,
     uintptr_t status_code,
@@ -330,7 +335,7 @@ ngx_http_c_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
 } /* ngx_http_c_func_init_method */
 
 static ngx_int_t
-ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf_t *scf) {
+ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf_t *scf, ngx_http_c_func_main_conf_t* mcf) {
     /**** Init the client apps ngx_http_c_func_init ***/
     char *error;
     ngx_http_c_func_app_handler func;
@@ -344,6 +349,7 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf
         /*** Init the apps ***/
         ngx_http_c_func_ctx_t new_ctx; //config request
         new_ctx.__log__ = cycle->log;
+        new_ctx.__process_lock__ = (void*)mcf->multi_processes_lock;
         func(&new_ctx);
     }
 
@@ -375,7 +381,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 static ngx_int_t
 ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
-#ifndef ngx_http_c_func_module_version_2
+#ifndef ngx_http_c_func_module_version_3
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -472,6 +478,7 @@ ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_core_srv_conf_t **cscfp;
     ngx_http_core_main_conf_t *cmcf;
+    ngx_http_c_func_main_conf_t *mcf;
 
     /** Only initialize when it is NGINX Worker or Single **/
     if (ngx_process != NGX_PROCESS_WORKER && ngx_process != NGX_PROCESS_SINGLE) {
@@ -481,6 +488,8 @@ ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
 
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
+    mcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+
     cscfp = cmcf->servers.elts;
 
     for (s = 0; s < cmcf->servers.nelts; s++) {
@@ -488,7 +497,7 @@ ngx_http_c_func_process_init(ngx_cycle_t *cycle) {
         scf = cscf->ctx->srv_conf[ngx_http_c_func_module.ctx_index];
         if (scf && scf->_libname.len > 0 ) {
             /**Proceed init call for each server and each worker**/
-            if (ngx_http_c_func_proceed_init_calls(cycle, scf) == NGX_ERROR) {
+            if (ngx_http_c_func_proceed_init_calls(cycle, scf, mcf) == NGX_ERROR) {
                 return NGX_ERROR;
             }
         } else {
@@ -504,9 +513,11 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_core_srv_conf_t **cscfp;
     ngx_http_core_main_conf_t *cmcf;
+    ngx_http_c_func_main_conf_t *mcf;
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
 
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
+    mcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
     cscfp = cmcf->servers.elts;
 
     char *error;
@@ -522,6 +533,7 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
             } else {
                 ngx_http_c_func_ctx_t new_ctx; //config request
                 new_ctx.__log__ = cycle->log;
+                new_ctx.__process_lock__ = (void*)mcf->multi_processes_lock;
                 func(&new_ctx);
             }
         } else {
@@ -536,6 +548,7 @@ ngx_http_c_func_master_exit(ngx_cycle_t *cycle) {
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_core_srv_conf_t **cscfp;
     ngx_http_core_main_conf_t *cmcf;
+    ngx_http_c_func_main_conf_t *cfunmcf;
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
 
     cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
@@ -554,7 +567,16 @@ ngx_http_c_func_master_exit(ngx_cycle_t *cycle) {
         } else {
             continue;
         }
-    }   
+    }
+
+    cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+
+    if (cfunmcf == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error when master exit");
+        return;
+    }
+
+    munmap((void*)cfunmcf->multi_processes_lock, sizeof(*(cfunmcf->multi_processes_lock)));
 
     ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-c-func module Exiting ");
 }
@@ -574,6 +596,10 @@ ngx_http_c_func_create_main_conf(ngx_conf_t *cf) {
 #else
     mcf->is_ssl_support = 0;
 #endif
+
+    mcf->multi_processes_lock = mmap(NULL, sizeof(*(mcf->multi_processes_lock)), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+    *mcf->multi_processes_lock = 0;
 
     return mcf;
 }
@@ -676,6 +702,7 @@ ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
 static ngx_int_t
 ngx_http_c_func_content_handler(ngx_http_request_t *r) {
     ngx_http_c_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
+    ngx_http_c_func_main_conf_t *mcf = ngx_http_get_module_main_conf(r, ngx_http_c_func_module);
     // ngx_http_c_func_internal_ctx_t *ctx;
     // ngx_int_t rc;
 
@@ -687,6 +714,7 @@ ngx_http_c_func_content_handler(ngx_http_request_t *r) {
     ngx_http_c_func_ctx_t new_ctx;
     new_ctx.__r__ = r;
     new_ctx.__log__ = r->connection->log;
+    new_ctx.__process_lock__ = (void*)mcf->multi_processes_lock;
 
     /***Set to default incase link library does not return anything ***/
     new_ctx.__rc__ = NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -961,6 +989,16 @@ ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size) {
 void*
 ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size) {
     return ngx_pcalloc( ((ngx_http_request_t*)ctx->__r__)->pool, size );
+}
+
+void
+ngx_http_c_func_process_lock(ngx_http_c_func_ctx_t *ctx) {
+    ngx_spinlock((ngx_atomic_t*) ctx->__process_lock__, 1, 2048);
+}
+
+void
+ngx_http_c_func_process_unlock(ngx_http_c_func_ctx_t *ctx) {
+    ngx_unlock((ngx_atomic_t*) ctx->__process_lock__);
 }
 
 void

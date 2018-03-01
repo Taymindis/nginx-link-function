@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_2 2
+#define ngx_http_c_func_module_version_3 3
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -54,6 +54,7 @@ typedef struct {
 	void* __r__;
 	void* __log__;
 	intptr_t __rc__;
+	void *__process_lock__;
 } ngx_http_c_func_ctx_t;
 
 extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
@@ -65,6 +66,8 @@ extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char
 extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
 extern void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+extern void ngx_http_c_func_process_lock(ngx_http_c_func_ctx_t *ctx);
+extern void ngx_http_c_func_process_unlock(ngx_http_c_func_ctx_t *ctx);
 
 #define ngx_http_c_func_log(loglevel, req_context, ...) ({\
 char __buff__[200];\

@@ -170,6 +170,16 @@ extern void ngx_http_c_func_write_resp(
     const char* resp_content
 );
 
+// Shared Memory and Cache Scope
+extern void ngx_http_c_func_shmtx_lock(void *shared_mem);
+extern void ngx_http_c_func_shmtx_unlock(void *shared_mem);
+extern void* ngx_http_c_func_shm_alloc(void *shared_mem, size_t size);
+extern void ngx_http_c_func_shm_free(void *shared_mem, void *ptr);
+extern void* ngx_http_c_func_cache_get(void *shared_mem, const char* key);
+extern void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
+extern void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
+extern void ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
+
 ```
 
 ## Interface break down details

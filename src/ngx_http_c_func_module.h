@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_3 3
+#define ngx_http_c_func_module_version_4 4
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -49,12 +49,12 @@
 typedef struct {
 	char *req_args; // Uri Args
 	u_char *req_body; // Request Body
+	void *shared_mem;
 
 	/* internal */
 	void* __r__;
 	void* __log__;
 	intptr_t __rc__;
-	void *__process_lock__;
 } ngx_http_c_func_ctx_t;
 
 extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
@@ -66,8 +66,6 @@ extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char
 extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
 extern void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
-extern void ngx_http_c_func_process_lock(ngx_http_c_func_ctx_t *ctx);
-extern void ngx_http_c_func_process_unlock(ngx_http_c_func_ctx_t *ctx);
 
 #define ngx_http_c_func_log(loglevel, req_context, ...) ({\
 char __buff__[200];\
@@ -82,3 +80,13 @@ extern void ngx_http_c_func_write_resp(
     const char* content_type,
     const char* resp_content
 );
+
+// Shared Memory and Cache Scope
+extern void ngx_http_c_func_shmtx_lock(void *shared_mem);
+extern void ngx_http_c_func_shmtx_unlock(void *shared_mem);
+extern void* ngx_http_c_func_shm_alloc(void *shared_mem, size_t size);
+extern void ngx_http_c_func_shm_free(void *shared_mem, void *ptr);
+extern void* ngx_http_c_func_cache_get(void *shared_mem, const char* key);
+extern void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
+extern void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
+extern void ngx_http_c_func_cache_remove(void *shared_mem, const char* key);

@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_4 4
+#define ngx_http_c_func_module_version_5 5
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -86,7 +86,9 @@ extern void ngx_http_c_func_shmtx_lock(void *shared_mem);
 extern void ngx_http_c_func_shmtx_unlock(void *shared_mem);
 extern void* ngx_http_c_func_shm_alloc(void *shared_mem, size_t size);
 extern void ngx_http_c_func_shm_free(void *shared_mem, void *ptr);
+extern void* ngx_http_c_func_shm_alloc_locked(void *shared_mem, size_t size);
+extern void ngx_http_c_func_shm_free_locked(void *shared_mem, void *ptr);
 extern void* ngx_http_c_func_cache_get(void *shared_mem, const char* key);
 extern void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
 extern void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
-extern void ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
+extern void* ngx_http_c_func_cache_remove(void *shared_mem, const char* key);

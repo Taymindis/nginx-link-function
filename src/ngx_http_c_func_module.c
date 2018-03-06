@@ -152,10 +152,12 @@ void ngx_http_c_func_shmtx_lock(void *shared_mem);
 void ngx_http_c_func_shmtx_unlock(void *shared_mem);
 void* ngx_http_c_func_shm_alloc(void *shared_mem, size_t size);
 void ngx_http_c_func_shm_free(void *shared_mem, void *ptr);
+void* ngx_http_c_func_shm_alloc_locked(void *shared_mem, size_t size);
+void ngx_http_c_func_shm_free_locked(void *shared_mem, void *ptr);
 void* ngx_http_c_func_cache_get(void *shared_mem, const char* key);
 void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
 void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
-void ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
+void* ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
 
 void ngx_http_c_func_write_resp(
     ngx_http_c_func_ctx_t *ctx,
@@ -499,7 +501,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 static ngx_int_t
 ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
-#ifndef ngx_http_c_func_module_version_4
+#ifndef ngx_http_c_func_module_version_5
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -1137,13 +1139,22 @@ ngx_http_c_func_shmtx_unlock(void *shared_mem) {
 
 void*
 ngx_http_c_func_shm_alloc(void *shared_mem, size_t size) {
-    return ngx_slab_alloc_locked(((ngx_http_c_func_http_shm_t*)shared_mem)->shpool, size);
+    return ngx_slab_alloc(((ngx_http_c_func_http_shm_t*)shared_mem)->shpool, size);
 }
 
 void
 ngx_http_c_func_shm_free(void *shared_mem, void *ptr) {
+    ngx_slab_free(((ngx_http_c_func_http_shm_t*)shared_mem)->shpool, ptr);
+}
+
+void*
+ngx_http_c_func_shm_alloc_locked(void *shared_mem, size_t size) {
+    return ngx_slab_alloc_locked(((ngx_http_c_func_http_shm_t*)shared_mem)->shpool, size);
+}
+
+void
+ngx_http_c_func_shm_free_locked(void *shared_mem, void *ptr) {
     ngx_slab_free_locked(((ngx_http_c_func_http_shm_t*)shared_mem)->shpool, ptr);
-    // ngx_spinlock((ngx_atomic_t*) ctx->__shm_t__->multi_processes_lock, 1, 2048);
 }
 
 void*
@@ -1210,16 +1221,22 @@ ngx_http_c_func_cache_new(void *shared_mem, const char* key,  size_t size) {
     return cvnt->value;
 }
 
-void
+void*
 ngx_http_c_func_cache_remove(void *shared_mem, const char* key) {
+    void *old_value;
     ngx_str_t str_key = ngx_string(key);
     uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
     ngx_http_c_func_http_shm_t *_cache = (ngx_http_c_func_http_shm_t *)shared_mem;
     ngx_http_c_func_http_cache_value_node_t *cvnt = (ngx_http_c_func_http_cache_value_node_t *)
             ngx_str_rbtree_lookup(&_cache->rbtree, &str_key, hash);
 
-    if (cvnt)
+    if (cvnt) {
+        old_value = cvnt->value;
         ngx_rbtree_delete(&_cache->rbtree, &cvnt->sn.node);
+        return old_value;
+    }
+
+    return NULL;
 }
 
 void

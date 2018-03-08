@@ -114,3 +114,18 @@ greeting=enjoy-http-c-function-testing
 Content-Type: text/plain
 --- response_body_like eval
 qr/greeting=enjoy-http-c-function-testing$/
+
+
+=== TEST 8: Set C_FUNC_TEST_CACHE
+--- config
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFunGetCache {
+    ngx_http_c_func_call "my_app_simple_get_cache";
+}
+--- request
+POST /testCFunGetCache
+--- error_code: 200
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/This is cache value$/

@@ -11,8 +11,15 @@ int is_service_on = 0;
 void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx) {
     ngx_http_c_func_log(info, ctx, "%s", "Starting The Application");
 
+    char* my_cache_value = ngx_http_c_func_cache_new(ctx->shared_mem, "key", sizeof("This is cache value") + 1);
 
+    if (my_cache_value) {
+        memset(my_cache_value, 0, sizeof("This is cache value") + 1 );
+        strcpy(my_cache_value, "This is cache value");
+    }
+    
     is_service_on = 1;
+
 }
 
 
@@ -122,7 +129,21 @@ void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
     }
 }
 
+void my_app_simple_get_cache(ngx_http_c_func_ctx_t *ctx) {
+    ngx_http_c_func_log_info(ctx, "logged from my_app_simple_get_cache");
 
+    char* my_cache_value = ngx_http_c_func_cache_get(ctx->shared_mem, "key");
+
+    if (my_cache_value) {
+        ngx_http_c_func_write_resp(
+            ctx,
+            200,
+            "200 OK",
+            "text/plain",
+            (char*)my_cache_value
+        );
+    }
+}
 
 void my_app_simple_get_no_resp(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get_no_resp");
@@ -132,6 +153,9 @@ void my_app_simple_get_no_resp(ngx_http_c_func_ctx_t *ctx) {
 
 
 void ngx_http_c_func_exit(ngx_http_c_func_ctx_t* ctx) {
+
+    ngx_http_c_func_cache_remove(ctx->shared_mem, "key");
+
     ngx_http_c_func_log(info, ctx, "%s\n", "Shutting down The Application");
 
     is_service_on = 0;

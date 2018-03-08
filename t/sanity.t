@@ -1,7 +1,7 @@
 # Test Suite to parse the relevant variable the sanity.t once built
 
-use lib 'inc';
-use lib 'lib';
+use lib '/home/dispatch/testMap/c-lib/test-nginx/inc';
+use lib '/home/dispatch/testMap/c-lib/test-nginx/lib';
 use Test::Nginx::Socket 'no_plan';
 
 no_long_string();
@@ -14,7 +14,7 @@ __DATA__
 
 === TEST 1: Set C_FUNC_TEST_1
 --- config
-ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
 location = /testCFunGreeting {
     ngx_http_c_func_call "my_app_simple_get_greeting";
 }
@@ -28,7 +28,7 @@ qr/greeting from ngx_http_c_func testing$/
 
 === TEST 2: Set C_FUNC_TEST_ARGS
 --- config
-ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
 location = /testCFunARGS {
     ngx_http_c_func_call "my_app_simple_get_args";
 }
@@ -41,12 +41,9 @@ Content-Type: text/plain
 qr/greeting=hello_nginx\?id=129310923$/
 
 
-
-
-
 === TEST 3: Set C_FUNC_TEST_POST_NONE
 --- config
-ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
 location = /testCFunPOSTBody {
     ngx_http_c_func_call "my_app_simple_post";
 }
@@ -60,9 +57,52 @@ Content-Type: text/plain
 qr/\s/
 
 
-=== TEST 4: Set C_FUNC_TEST_POST_BODY
+=== TEST 4: Set C_FUNC_TEST_GET_TOKEN
 --- config
-ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
+location = /testCFunCVerifyToken {
+    ngx_http_c_func_call "my_app_simple_get_token_args";
+}
+--- request
+GET /testCFunCVerifyToken?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==
+--- error_code: 401
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==$/
+
+
+=== TEST 5: Set C_FUNC_TEST_GET_ERROR_RESP
+--- config
+ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
+location = /testCFUNCERRORRESP {
+    ngx_http_c_func_call "my_app_simple_get_no_resp";
+}
+--- request
+GET /testCFUNCERRORRESP?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==
+--- error_code: 500
+--- response_headers
+Content-Type: text/html
+
+
+=== TEST 6: Set C_FUNC_TEST_GET_CALLOC_FROM_POOL
+--- config
+ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
+location = /testCFUNCCallocFromPool {
+    ngx_http_c_func_call "my_app_simple_get_calloc_from_pool";
+}
+--- request
+GET /testCFUNCCallocFromPool
+--- error_code: 200
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/This is the message calloc from pool$/
+
+
+=== TEST 7: Set C_FUNC_TEST_POST_BODY
+--- config
+ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
 location = /testCFunPOSTBody {
     ngx_http_c_func_call "my_app_simple_post";
 }
@@ -76,29 +116,16 @@ Content-Type: text/plain
 qr/greeting=enjoy-http-c-function-testing$/
 
 
-=== TEST 5: Set C_FUNC_TEST_GET_TOKEN
+=== TEST 8: Set C_FUNC_TEST_CACHE
 --- config
-ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
-location = /testCFunCVerifyToken {
-    ngx_http_c_func_call "my_app_simple_get_token_args";
+ngx_http_c_func_link_lib "/home/dispatch/testMap/c-lib/nginx-c-function/t/libcfuntest.so";
+location = /testCFunGetCache {
+    ngx_http_c_func_call "my_app_simple_get_cache";
 }
 --- request
-GET /testCFunCVerifyToken?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==
---- error_code: 401
+POST /testCFunGetCache
+--- error_code: 200
 --- response_headers
 Content-Type: text/plain
 --- response_body_like eval
-qr/QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==$/
-
-
-=== TEST 6: Set C_FUNC_TEST_GET_ERROR_RESP
---- config
-ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
-location = /testCFUNCERRORRESP {
-    ngx_http_c_func_call "my_app_simple_get_no_resp";
-}
---- request
-GET /testCFUNCERRORRESP?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==
---- error_code: 500
---- response_headers
-Content-Type: text/html
+qr/This is cache value$/

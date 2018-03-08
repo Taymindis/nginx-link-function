@@ -148,6 +148,7 @@ void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *ke
 void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 
+uintptr_t ngx_http_c_func_shmtx_trylock(void *shared_mem);
 void ngx_http_c_func_shmtx_lock(void *shared_mem);
 void ngx_http_c_func_shmtx_unlock(void *shared_mem);
 void* ngx_http_c_func_shm_alloc(void *shared_mem, size_t size);
@@ -501,7 +502,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 static ngx_int_t
 ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
-#ifndef ngx_http_c_func_module_version_5
+#ifndef ngx_http_c_func_module_version_6
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -1123,6 +1124,11 @@ ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size) {
 void*
 ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size) {
     return ngx_pcalloc( ((ngx_http_request_t*)ctx->__r__)->pool, size );
+}
+
+uintptr_t
+ngx_http_c_func_shmtx_trylock(void *shared_mem) {
+    return ngx_shmtx_trylock(&((ngx_http_c_func_http_shm_t*)shared_mem)->shpool->mutex);
 }
 
 void

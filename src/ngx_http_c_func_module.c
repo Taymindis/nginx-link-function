@@ -1165,7 +1165,7 @@ ngx_http_c_func_shm_free_locked(void *shared_mem, void *ptr) {
 
 void*
 ngx_http_c_func_cache_get(void *shared_mem, const char* key) {
-    ngx_str_t str_key = ngx_string(key);
+    ngx_str_t str_key = { ngx_strlen(key), (u_char *) key };
     uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
     ngx_http_c_func_http_shm_t *_cache = (ngx_http_c_func_http_shm_t *)shared_mem;
     ngx_http_c_func_http_cache_value_node_t *cvnt = (ngx_http_c_func_http_cache_value_node_t *)
@@ -1183,10 +1183,11 @@ ngx_http_c_func_cache_get(void *shared_mem, const char* key) {
 */
 void*
 ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value) {
-    void *old_value;
-    ngx_str_t str_key = ngx_string(key);
-    uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
     ngx_http_c_func_http_shm_t *_cache = (ngx_http_c_func_http_shm_t *)shared_mem;
+
+    void *old_value;
+    ngx_str_t str_key = { ngx_strlen(key), (u_char *) key };
+    uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
     ngx_http_c_func_http_cache_value_node_t *cvnt = (ngx_http_c_func_http_cache_value_node_t *)
             ngx_str_rbtree_lookup(&_cache->rbtree, &str_key, hash);
     if (cvnt) {
@@ -1201,7 +1202,12 @@ ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value) {
         }
         cvnt->value = value;
         cvnt->sn.node.key = hash;
-        ngx_str_set(&cvnt->sn.str , key);
+
+        ngx_str_t *new_str_key = &(cvnt->sn.str);
+        new_str_key->len = str_key.len;
+        new_str_key->data = (u_char*) ngx_slab_alloc_locked(_cache->shpool, sizeof(u_char) * (new_str_key->len + 1) );
+        ngx_memcpy(new_str_key->data, str_key.data, new_str_key->len);
+        new_str_key->data[new_str_key->len] = 0;
         ngx_rbtree_insert(&_cache->rbtree, &cvnt->sn.node);
         return NULL;
     }
@@ -1209,10 +1215,7 @@ ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value) {
 
 void*
 ngx_http_c_func_cache_new(void *shared_mem, const char* key,  size_t size) {
-    ngx_str_t str_key = ngx_string(key);
-    uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
     ngx_http_c_func_http_shm_t *_cache = (ngx_http_c_func_http_shm_t *)shared_mem;
-
     ngx_http_c_func_http_cache_value_node_t *cvnt = (ngx_http_c_func_http_cache_value_node_t *)
             ngx_slab_alloc_locked(_cache->shpool, sizeof(ngx_http_c_func_http_cache_value_node_t));
 
@@ -1220,9 +1223,16 @@ ngx_http_c_func_cache_new(void *shared_mem, const char* key,  size_t size) {
         return NULL;
     }
 
+    ngx_str_t *str_key = &(cvnt->sn.str);
+    str_key->len = ngx_strlen(key);
+    str_key->data = (u_char*) ngx_slab_alloc_locked(_cache->shpool, sizeof(u_char) * (str_key->len + 1) );
+    ngx_memcpy(str_key->data, key, str_key->len);
+    str_key->data[str_key->len] = 0;
+    
+    uint32_t hash = ngx_crc32_long(str_key->data, str_key->len);
+
     cvnt->value = ngx_slab_alloc_locked(_cache->shpool, size);
     cvnt->sn.node.key = hash;
-    ngx_str_set(&cvnt->sn.str , key);
     ngx_rbtree_insert(&_cache->rbtree, &cvnt->sn.node);
     return cvnt->value;
 }
@@ -1230,7 +1240,7 @@ ngx_http_c_func_cache_new(void *shared_mem, const char* key,  size_t size) {
 void*
 ngx_http_c_func_cache_remove(void *shared_mem, const char* key) {
     void *old_value;
-    ngx_str_t str_key = ngx_string(key);
+    ngx_str_t str_key = { ngx_strlen(key), (u_char *) key };
     uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
     ngx_http_c_func_http_shm_t *_cache = (ngx_http_c_func_http_shm_t *)shared_mem;
     ngx_http_c_func_http_cache_value_node_t *cvnt = (ngx_http_c_func_http_cache_value_node_t *)
@@ -1238,6 +1248,7 @@ ngx_http_c_func_cache_remove(void *shared_mem, const char* key) {
 
     if (cvnt) {
         old_value = cvnt->value;
+        ngx_slab_free_locked(_cache->shpool, cvnt->sn.str.data);
         ngx_rbtree_delete(&_cache->rbtree, &cvnt->sn.node);
         return old_value;
     }

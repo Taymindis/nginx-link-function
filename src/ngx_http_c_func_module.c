@@ -453,6 +453,7 @@ ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf
         ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "application initializing");
         /*** Init the apps ***/
         ngx_http_c_func_ctx_t new_ctx; //config request
+        new_ctx.__pl__ = cycle->pool;
         new_ctx.__log__ = cycle->log;
         new_ctx.shared_mem = (void*)mcf->shm_ctx->shared_mem;
         func(&new_ctx);
@@ -502,7 +503,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 static ngx_int_t
 ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
-#ifndef ngx_http_c_func_module_version_6
+#ifndef ngx_http_c_func_module_version_7
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -655,6 +656,7 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
                 ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error function call %s", error);
             } else {
                 ngx_http_c_func_ctx_t new_ctx; //config request
+                new_ctx.__pl__ = cycle->pool;
                 new_ctx.__log__ = cycle->log;
                 new_ctx.shared_mem = (void*)mcf->shm_ctx->shared_mem;
                 func(&new_ctx);
@@ -848,6 +850,7 @@ ngx_http_c_func_content_handler(ngx_http_request_t *r) {
 
     ngx_http_c_func_ctx_t new_ctx;
     new_ctx.__r__ = r;
+    new_ctx.__pl__ = r->pool;
     new_ctx.__log__ = r->connection->log;
     new_ctx.shared_mem = (void*)mcf->shm_ctx->shared_mem;
 
@@ -1118,12 +1121,12 @@ ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key) {
 
 void*
 ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size) {
-    return ngx_palloc( ((ngx_http_request_t*)ctx->__r__)->pool, size );
+    return ngx_palloc( (ngx_pool_t*)ctx->__pl__, size );
 }
 
 void*
 ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size) {
-    return ngx_pcalloc( ((ngx_http_request_t*)ctx->__r__)->pool, size );
+    return ngx_pcalloc( (ngx_pool_t*)ctx->__pl__, size );
 }
 
 uintptr_t
@@ -1228,7 +1231,7 @@ ngx_http_c_func_cache_new(void *shared_mem, const char* key,  size_t size) {
     str_key->data = (u_char*) ngx_slab_alloc_locked(_cache->shpool, sizeof(u_char) * (str_key->len + 1) );
     ngx_memcpy(str_key->data, key, str_key->len);
     str_key->data[str_key->len] = 0;
-    
+
     uint32_t hash = ngx_crc32_long(str_key->data, str_key->len);
 
     cvnt->value = ngx_slab_alloc_locked(_cache->shpool, size);

@@ -8,18 +8,18 @@
 * @section LICENSE
 *
 * Copyright (c) 2018, Taymindis <cloudleware2015@gmail.com>
-* 
+*
 * This module is licensed under the terms of the BSD license.
-* 
+*
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are met:
-* 
+*
 * 1. Redistributions of source code must retain the above copyright notice, this
 *    list of conditions and the following disclaimer.
 * 2. Redistributions in binary form must reproduce the above copyright notice,
 *    this list of conditions and the following disclaimer in the documentation
 *    and/or other materials provided with the distribution.
-* 
+*
 * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_7 7
+#define ngx_http_c_func_module_version_8 8
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -79,6 +79,11 @@ extern void ngx_http_c_func_write_resp(
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,
+    const char* resp_content
+);
+
+extern void ngx_http_c_func_set_resp_var(
+    ngx_http_c_func_ctx_t *ctx,
     const char* resp_content
 );
 

@@ -39,7 +39,8 @@ server {
   ...
   ...
   location = /testCFunGreeting {
-      ngx_http_c_func_call "my_app_simple_get_greeting";
+      # if not variable specified, direct write response out
+      ngx_http_c_func_call "my_app_simple_get_greeting"; 
   }
 }
 
@@ -50,7 +51,10 @@ server {
   ...
   ...
   location = /testCFunGreeting {
-      ngx_http_c_func_call "my_app_simple_get_greeting";
+      # if variable specified, not response write out, but it stored into myResponseVariable
+      ngx_http_c_func_call "my_app_simple_get_greeting" respTo=myResponseVariable;
+
+      return 200 $myResponseVariable;
   }
 }
 

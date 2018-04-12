@@ -26,6 +26,7 @@ Content-Type: text/plain
 --- response_body_like eval
 qr/greeting from ngx_http_c_func testing$/
 
+
 === TEST 2: Set C_FUNC_TEST_ARGS
 --- config
 ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
@@ -129,3 +130,35 @@ POST /testCFunGetCache
 Content-Type: text/plain
 --- response_body_like eval
 qr/This is cache value$/
+
+
+=== TEST 9: Set C_FUNC_TEST_VARIABLE
+--- config
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFunGreeting {
+    ngx_http_c_func_call "my_app_simple_get_greeting" respTo=myRespVariable;
+    return 200 $myRespVariable;
+}
+--- request
+GET /testCFunGreeting
+--- error_code: 200
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/greeting from ngx_http_c_func testing$/
+
+
+=== TEST 10: Set C_FUNC_TEST_ARGS_AND_VARIABLE
+--- config
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFunARGS {
+    ngx_http_c_func_call "my_app_simple_get_args" respTo=simpleRespVariable;
+    return 200 $simpleRespVariable;
+}
+--- request
+GET /testCFunARGS?greeting=hello_nginx?id=129310923
+--- error_code: 200
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/greeting=hello_nginx\?id=129310923$/

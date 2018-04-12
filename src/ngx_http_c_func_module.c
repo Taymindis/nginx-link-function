@@ -82,18 +82,22 @@ typedef struct {
 typedef struct {
     ngx_str_t _method_name;
     ngx_http_c_func_app_handler _handler;
+    ngx_flag_t _is_call_to_var;
 } ngx_http_c_func_loc_conf_t;
 
 typedef struct {
     unsigned done: 1;
     unsigned waiting_more_body: 1;
+
+    /*** For store Response ***/
+    size_t      resp_len;
+    u_char     *resp;
 } ngx_http_c_func_internal_ctx_t;
 
 typedef struct {
     ngx_queue_t _queue;
     ngx_http_c_func_loc_conf_t* _loc_conf;
 } ngx_http_c_func_loc_q_t;
-
 
 static ngx_int_t ngx_http_c_func_pre_configuration(ngx_conf_t *cf);
 static ngx_int_t ngx_http_c_func_post_configuration(ngx_conf_t *cf);
@@ -116,6 +120,8 @@ static void ngx_http_c_func_master_exit(ngx_cycle_t *cycle);
 static void ngx_http_c_func_client_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf_t *scf, ngx_http_c_func_main_conf_t* mcf);
 static u_char* ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len);
+
+static ngx_int_t ngx_http_c_func_get_resp_var(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 
 /*** Download Feature Support ***/
 typedef struct {
@@ -160,6 +166,12 @@ void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
 void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
 void* ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
 
+void
+ngx_http_c_func_set_resp_var(
+    ngx_http_c_func_ctx_t *ctx,
+    const char* resp_content
+);
+
 void ngx_http_c_func_write_resp(
     ngx_http_c_func_ctx_t *ctx,
     uintptr_t status_code,
@@ -171,6 +183,7 @@ void ngx_http_c_func_write_resp(
 // static ngx_conf_post_t ngx_http_c_func_srv_post_conf = {
 //     ngx_http_c_func_srv_post_conf_handler
 // };
+
 
 /**
  * This module provided directive.
@@ -209,8 +222,7 @@ static ngx_command_t ngx_http_c_func_commands[] = {
         NULL
     },
     {   ngx_string("ngx_http_c_func_call"), /* directive */
-        NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1, /* location context and takes
-                                            no arguments*/
+        NGX_HTTP_LOC_CONF | NGX_CONF_TAKE12, /* location context and takes 1 or 2 arguments*/
         ngx_http_c_func_init_method, /* configuration setup function */
         NGX_HTTP_LOC_CONF_OFFSET, /* No offset. Only one context is supported. */
         offsetof(ngx_http_c_func_loc_conf_t, _method_name), /* No offset when storing the module configuration on struct. */
@@ -259,7 +271,8 @@ ngx_http_c_func_shm_cache_init(ngx_shm_zone_t *shm_zone, void *data)
     ngx_slab_pool_t *shpool;
 
     if (oshm) {
-        shm_zone->data = oshm;
+        nshm->name = oshm->name;
+        nshm->shared_mem = oshm->shared_mem;
         return NGX_OK;
     }
 
@@ -418,18 +431,43 @@ ngx_http_c_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command_t 
  */
 static char *
 ngx_http_c_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-    // ngx_str_t *value;
+    ngx_str_t *value;
     ngx_http_core_loc_conf_t *clcf; /* pointer to core location configuration */
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_c_func_loc_conf_t *lcf = conf;
+    ngx_str_t varname;
 
-    // value = cf->args->elts;
 
     clcf = ngx_http_conf_get_module_loc_conf(cf, ngx_http_core_module);
     scf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_c_func_module);
 
+    value = cf->args->elts;
+
+    if (cf->args->nelts == 3 &&
+            value[2].len > sizeof("respTo=") - 1 &&
+            ngx_strncmp(value[2].data, "respTo=", 6) == 0 ) {
+
+        lcf->_is_call_to_var = 1;
+
+        varname.data = value[2].data + sizeof("respTo=") - 1;
+        varname.len = value[2].len - (sizeof("respTo=") - 1);
+
+        ngx_http_variable_t  *var;
+        var = ngx_http_add_variable(cf, &varname, NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE | NGX_HTTP_VAR_NOHASH);
+        if (var == NULL) {
+            return NGX_CONF_ERROR;
+        }
+        var->get_handler = ngx_http_c_func_get_resp_var;
+        var->data = 0;
+    }
+
+
+
     /***This handler is under NGX_HTTP_CONTENT_PHASE which is the phase ready to generate response ****/
-    clcf->handler = ngx_http_c_func_content_handler;
+    if (!lcf->_is_call_to_var) {
+        clcf->handler = ngx_http_c_func_content_handler;
+    }
+
     if (scf && scf->_libname.len > 0) {
         ngx_http_c_func_loc_q_t *loc_q = ngx_pcalloc(cf->pool, sizeof(ngx_http_c_func_loc_q_t));
         loc_q->_loc_conf = lcf;
@@ -438,6 +476,7 @@ ngx_http_c_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     }
     return ngx_conf_set_str_slot(cf, cmd, conf);
 } /* ngx_http_c_func_init_method */
+
 
 static ngx_int_t
 ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf_t *scf, ngx_http_c_func_main_conf_t* mcf) {
@@ -503,7 +542,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 static ngx_int_t
 ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
-#ifndef ngx_http_c_func_module_version_7
+#ifndef ngx_http_c_func_module_version_8
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -701,6 +740,7 @@ ngx_http_c_func_master_exit(ngx_cycle_t *cycle) {
         return;
     }
 
+
     // if (cfunmcf->shm_ctx && cfunmcf->shm_ctx->shared_mem) {
     //     if (cfunmcf->shm_ctx->shared_mem->shpool && cfunmcf->shm_ctx->shared_mem->shpool->log_ctx) {
     //         ngx_slab_free(cfunmcf->shm_ctx->shared_mem->shpool, cfunmcf->shm_ctx->shared_mem->shpool->log_ctx);
@@ -800,6 +840,7 @@ ngx_http_c_func_create_loc_conf(ngx_conf_t *cf) {
     if (conf == NULL) {
         return NGX_CONF_ERROR;
     }
+    conf->_is_call_to_var = 0;
     /***ngx_pcalloc has inited properly*/
     // conf->_method_name.len = NGX_CONF_UNSET_SIZE;
     return conf;
@@ -965,6 +1006,7 @@ REQUEST_BODY_DONE:
  */
 static ngx_int_t
 ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
+    ngx_http_c_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
     ngx_http_c_func_internal_ctx_t *ctx;
     ngx_int_t rc;
 
@@ -977,6 +1019,9 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
         if (ctx != NULL) {
             if (ctx->done) {
                 /***Done Reading***/
+                if (lcf->_is_call_to_var) {
+                    return ngx_http_c_func_content_handler(r);
+                }
                 return NGX_DECLINED;
             }
             return NGX_DONE;
@@ -989,6 +1034,8 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Insufficient Memory to create ngx_http_c_func_internal_ctx_t");
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
+
+        ctx->resp = NULL;
 
         ngx_http_set_ctx(r, ctx, ngx_http_c_func_module);
 
@@ -1007,8 +1054,26 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
             ctx->waiting_more_body = 1;
             return NGX_DONE;
         }
+
+        if (lcf->_is_call_to_var) {
+            return ngx_http_c_func_content_handler(r);
+        }
         return NGX_DECLINED;
     } else { //if (!(r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH))) {
+        ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
+        if (ctx == NULL) {
+            /* calloc, has init with 0 value*/
+            ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_c_func_internal_ctx_t));
+            if (ctx == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Insufficient Memory to create ngx_http_c_func_internal_ctx_t");
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+            ctx->resp = NULL;
+            ngx_http_set_ctx(r, ctx, ngx_http_c_func_module);
+        }
+        if (lcf->_is_call_to_var) {
+            return ngx_http_c_func_content_handler(r);
+        }
         return NGX_DECLINED;
     }
 }
@@ -1259,6 +1324,50 @@ ngx_http_c_func_cache_remove(void *shared_mem, const char* key) {
     return NULL;
 }
 
+/***This handler when nginx.conf call $ngx_c_func_resp*/
+static ngx_int_t
+ngx_http_c_func_get_resp_var(ngx_http_request_t *r,
+                             ngx_http_variable_value_t *v, uintptr_t data)
+{
+    ngx_http_c_func_internal_ctx_t *internal_ctx;
+
+    internal_ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
+
+    if (internal_ctx == NULL) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    v->len = internal_ctx->resp_len;
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
+    v->data = internal_ctx->resp;
+
+    return NGX_OK;
+}
+
+void
+ngx_http_c_func_set_resp_var(
+    ngx_http_c_func_ctx_t *ctx,
+    const char* resp_content
+) {
+    ngx_http_c_func_internal_ctx_t *internal_ctx;
+    ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
+    internal_ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
+
+    if (internal_ctx != NULL) {
+        internal_ctx->resp_len = ngx_strlen(resp_content);
+        internal_ctx->resp = (u_char*)resp_content;
+
+        /** Decline means continue to next handler for this phase **/
+        ctx->__rc__ = NGX_DECLINED;
+    } else {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Error while storing resp to variable.");
+        ctx->__rc__ = NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+}
+
 void
 ngx_http_c_func_write_resp(
     ngx_http_c_func_ctx_t *ctx,
@@ -1271,6 +1380,15 @@ ngx_http_c_func_write_resp(
     ngx_chain_t out;
     size_t resp_content_len;
     ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
+
+    if ( ((ngx_http_c_func_loc_conf_t*) ngx_http_get_module_loc_conf(r, ngx_http_c_func_module) )->_is_call_to_var ) {
+        ngx_log_error(NGX_LOG_WARN,
+                      r->connection->log,
+                      0,
+                      ", \n Recommended to call ngx_http_c_func_set_resp_var. \n ngx_http_c_func_write_resp only applicable when no variable stored");
+        return ngx_http_c_func_set_resp_var(ctx, resp_content);
+    }
+
     /* Set the Content-Type header. */
     if (content_type) {
         r->headers_out.content_type.len = ngx_strlen(content_type);

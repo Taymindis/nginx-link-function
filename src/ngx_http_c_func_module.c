@@ -37,7 +37,6 @@
 #include <ngx_http.h>
 #include <ngx_http_c_func_module.h>
 
-
 #define MODULE_NAME "ngx_c_function"
 
 /****

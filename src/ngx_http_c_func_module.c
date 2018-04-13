@@ -118,7 +118,7 @@ static ngx_int_t ngx_http_c_func_module_init(ngx_cycle_t *cycle);
 static void ngx_http_c_func_master_exit(ngx_cycle_t *cycle);
 static void ngx_http_c_func_client_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_c_func_srv_conf_t *scf, ngx_http_c_func_main_conf_t* mcf);
-static u_char* ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len);
+static u_char* ngx_http_c_func_strdup_with_p(ngx_pool_t *pool, const char *src, size_t len);
 
 static ngx_int_t ngx_http_c_func_get_resp_var(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static void ngx_http_c_func_set_resp_var_with_r(ngx_http_request_t *r, ngx_http_c_func_ctx_t *ctx, const char* resp_content);
@@ -149,6 +149,7 @@ void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
 void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg);
 void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg);
 void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg);
+char *ngx_http_c_func_strdup(ngx_http_c_func_ctx_t *ctx, const char *src);
 u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key);
 void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
 void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
@@ -532,7 +533,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 static ngx_int_t
 ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
-#ifndef ngx_http_c_func_module_version_8
+#ifndef ngx_http_c_func_module_version_9
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -1103,8 +1104,19 @@ ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg) {
     ngx_log_error(NGX_LOG_ERR, (ngx_log_t *)ctx->__log__, 0, "%s", msg);
 }
 
+char*
+ngx_http_c_func_strdup(ngx_http_c_func_ctx_t *ctx, const char *src) {
+    char *dst;
+    if (src == NULL) return NULL;    
+    size_t len = ngx_strlen(src);
+    dst = (char*) ngx_palloc((ngx_pool_t*)ctx->__pl__, (len + 1) * sizeof(char));
+    ngx_memcpy(dst, src, len);
+    dst[len] = '\0';
+    return dst;
+}
+
 static u_char*
-ngx_http_c_func_strdup(ngx_pool_t *pool, const char *src, size_t len) {
+ngx_http_c_func_strdup_with_p(ngx_pool_t *pool, const char *src, size_t len) {
     u_char  *dst;
     dst = ngx_pcalloc(pool, len + 1);
     if (dst == NULL) {
@@ -1404,11 +1416,11 @@ ngx_http_c_func_write_resp(
     /* Set the Content-Type header. */
     if (content_type) {
         r->headers_out.content_type.len = ngx_strlen(content_type);
-        r->headers_out.content_type.data = ngx_http_c_func_strdup(r->pool, content_type, r->headers_out.content_type.len);
+        r->headers_out.content_type.data = ngx_http_c_func_strdup_with_p(r->pool, content_type, r->headers_out.content_type.len);
     } else {
         static const char* plaintext_content_type = ngx_http_c_func_content_type_plaintext;
         r->headers_out.content_type.len = ngx_strlen(plaintext_content_type);
-        r->headers_out.content_type.data = ngx_http_c_func_strdup(r->pool, plaintext_content_type, r->headers_out.content_type.len);
+        r->headers_out.content_type.data = ngx_http_c_func_strdup_with_p(r->pool, plaintext_content_type, r->headers_out.content_type.len);
     }
 
     ngx_buf_t *b;
@@ -1433,7 +1445,7 @@ ngx_http_c_func_write_resp(
 
     if (status_line) {
         r->headers_out.status_line.len = ngx_strlen(status_line);
-        r->headers_out.status_line.data = ngx_http_c_func_strdup(r->pool, status_line, r->headers_out.status_line.len);
+        r->headers_out.status_line.data = ngx_http_c_func_strdup_with_p(r->pool, status_line, r->headers_out.status_line.len);
     }
 
     /* Get the content length of the body. */

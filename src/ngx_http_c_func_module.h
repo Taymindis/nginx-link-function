@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_8 8
+#define ngx_http_c_func_module_version_9 9
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -67,6 +67,9 @@ extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char
 extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
 extern void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+
+extern char *ngx_http_c_func_strdup(ngx_http_c_func_ctx_t *ctx, const char *src);
+
 
 #define ngx_http_c_func_log(loglevel, req_context, ...) ({\
 char __buff__[200];\

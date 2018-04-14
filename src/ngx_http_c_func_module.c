@@ -691,6 +691,12 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
                 new_ctx.shared_mem = (void*)mcf->shm_ctx->shared_mem;
                 func(&new_ctx);
             }
+            // Unload app, unload old app if nginx reload
+            if (dlclose(scf->_app) != 0) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error to unload the app lib %V", &scf->_libname);
+            } else {
+                ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "Unloaded app lib %V", &scf->_libname);
+            }
         } else {
             continue;
         }
@@ -699,38 +705,39 @@ ngx_http_c_func_process_exit(ngx_cycle_t *cycle) {
 
 static void
 ngx_http_c_func_master_exit(ngx_cycle_t *cycle) {
-    ngx_uint_t s;
-    ngx_http_c_func_srv_conf_t *scf;
-    ngx_http_core_srv_conf_t **cscfp;
-    ngx_http_core_main_conf_t *cmcf;
-    ngx_http_c_func_main_conf_t *cfunmcf;
-    ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
+    // Bug Fixed Migrate dlclose to process exit cycle to handling nginx reload
+    // ngx_uint_t s;
+    // ngx_http_c_func_srv_conf_t *scf;
+    // ngx_http_core_srv_conf_t **cscfp;
+    // ngx_http_core_main_conf_t *cmcf;
+    // ngx_http_c_func_main_conf_t *cfunmcf;
+    // ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
 
-    cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
-    cscfp = cmcf->servers.elts;
+    // cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
+    // cscfp = cmcf->servers.elts;
 
-    for (s = 0; s < cmcf->servers.nelts; s++) {
-        ngx_http_core_srv_conf_t *cscf = cscfp[s];
-        scf = cscf->ctx->srv_conf[ngx_http_c_func_module.ctx_index];
-        if (scf && scf->_app ) {
-            if (dlclose(scf->_app) != 0) {
-                ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error to unload the app lib %V", &scf->_libname);
-            } else {
-                ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Unloaded app lib %V", &scf->_libname);
-            }
+    // for (s = 0; s < cmcf->servers.nelts; s++) {
+    //     ngx_http_core_srv_conf_t *cscf = cscfp[s];
+    //     scf = cscf->ctx->srv_conf[ngx_http_c_func_module.ctx_index];
+    //     if (scf && scf->_app ) {
+    //         if (dlclose(scf->_app) != 0) {
+    //             ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error to unload the app lib %V", &scf->_libname);
+    //         } else {
+    //             ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Unloaded app lib %V", &scf->_libname);
+    //         }
 
-        } else {
-            continue;
-        }
-    }
+    //     } else {
+    //         continue;
+    //     }
+    // }
 
-    cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
+    // cfunmcf = ctx->main_conf[ngx_http_c_func_module.ctx_index];
 
-    if (cfunmcf == NULL) {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error when master exit");
-        return;
-    }
-
+    // if (cfunmcf == NULL) {
+    //     ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error when master exit");
+    //     return;
+    // }
+    // End Bug Fixed Migrate dlclose to process exit cycle to handling nginx reload
 
     // if (cfunmcf->shm_ctx && cfunmcf->shm_ctx->shared_mem) {
     //     if (cfunmcf->shm_ctx->shared_mem->shpool && cfunmcf->shm_ctx->shared_mem->shpool->log_ctx) {

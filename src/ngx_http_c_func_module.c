@@ -1114,7 +1114,7 @@ ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg) {
 char*
 ngx_http_c_func_strdup(ngx_http_c_func_ctx_t *ctx, const char *src) {
     char *dst;
-    if (src == NULL) return NULL;    
+    if (src == NULL) return NULL;
     size_t len = ngx_strlen(src);
     dst = (char*) ngx_palloc((ngx_pool_t*)ctx->__pl__, (len + 1) * sizeof(char));
     ngx_memcpy(dst, src, len);
@@ -1367,7 +1367,7 @@ ngx_http_c_func_set_resp_var(
 
     if (internal_ctx != NULL) {
         internal_ctx->resp_len = ngx_strlen(resp_content);
-        internal_ctx->resp = (u_char*)resp_content;
+        internal_ctx->resp = ngx_http_c_func_strdup_with_p(r->pool, resp_content, internal_ctx->resp_len);
 
         /** Decline means continue to next handler for this phase **/
         ctx->__rc__ = NGX_DECLINED;
@@ -1388,7 +1388,7 @@ ngx_http_c_func_set_resp_var_with_r(
 
     if (internal_ctx != NULL) {
         internal_ctx->resp_len = ngx_strlen(resp_content);
-        internal_ctx->resp = (u_char*)resp_content;
+        internal_ctx->resp = ngx_http_c_func_strdup_with_p(r->pool, resp_content, internal_ctx->resp_len);
 
         /** Decline means continue to next handler for this phase **/
         ctx->__rc__ = NGX_DECLINED;
@@ -1431,18 +1431,17 @@ ngx_http_c_func_write_resp(
     }
 
     ngx_buf_t *b;
-    /* Allocate a new buffer for sending out the reply. */
-    b = ngx_pcalloc(r->pool, sizeof(ngx_buf_t));
 
     if ( resp_content ) {
         resp_content_len = ngx_strlen(resp_content);
-        b->pos = (u_char*)resp_content; /* first position in memory of the data */
-        b->last = (u_char*) (resp_content + resp_content_len); /* last position in memory of the data */
+        /* Allocate a new buffer for sending out the reply. */
+        b = ngx_create_temp_buf(r->pool, resp_content_len);
+        b->last = ngx_copy(b->last, resp_content, resp_content_len);
     } else {
-        static const char* emptyLine = "\n";
-        resp_content_len = ngx_strlen(emptyLine);
-        b->pos = (u_char*)emptyLine; /* first position in memory of the data */
-        b->last = (u_char*) (emptyLine + resp_content_len); /* last position in memory of the data */
+        /* Allocate a new buffer for sending out the reply. */
+        resp_content_len = 1;
+        b = ngx_create_temp_buf(r->pool, resp_content_len);
+        *b->last++ = LF;
     }
 
     b->memory = 1; /* content is in read-only memory */

@@ -237,6 +237,8 @@ extern void ngx_http_c_func_write_resp(
 Sample Application Development
 ===============================
 
+Feel free to clone a sample project on [Sample Project](https://github.com/Taymindis/sample-ngx-cfunc-project)
+
 ```c
 #include <stdio.h>
 #include <ngx_http_c_func_module.h>

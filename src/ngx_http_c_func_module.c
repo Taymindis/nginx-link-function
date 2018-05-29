@@ -134,7 +134,7 @@ static ngx_int_t ngx_http_c_func_get_resp_var(ngx_http_request_t *r, ngx_http_va
 static void ngx_http_c_func_set_resp_var_with_r(ngx_http_request_t *r, ngx_http_c_func_ctx_t *ctx, const char* resp_content);
 static void ngx_http_c_func_output_filter(ngx_http_request_t *r);
 
-#if (NGX_THREADS)
+#if (NGX_THREADS) && (nginx_version > 1013003)
 static void ngx_http_c_func_after_process(ngx_event_t *ev);
 static void ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log);
 #endif
@@ -523,8 +523,8 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
         /***Enable pre content phase for apps concurrent processing request layer, NGX_DONE and wait for finalize request ***/
 #if (nginx_version > 1013003)
         h = ngx_array_push(&cmcf->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
-#else
-        h = ngx_array_push(&cmcf->phases[NGX_HTTP_TRY_FILES_PHASE].handlers);
+#else  /**Access Phase is the only last phase for multi thread**/
+        h = ngx_array_push(&cmcf->phases[NGX_HTTP_CONTENT_PHASE].handlers);
 #endif
         if (h == NULL) {
             return NGX_ERROR;
@@ -887,7 +887,7 @@ ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     return NGX_CONF_OK;
 }
 
-#if (NGX_THREADS)
+#if (NGX_THREADS) && (nginx_version > 1013003)
 static void
 ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log)
 {
@@ -1072,7 +1072,7 @@ REQUEST_BODY_DONE:
         new_ctx->req_body = NULL;
     }
 
-#if (NGX_THREADS)
+#if (NGX_THREADS) && (nginx_version > 1013003)
     ngx_thread_pool_t         *tp;
     ngx_http_core_loc_conf_t     *clcf;
 
@@ -1097,14 +1097,18 @@ REQUEST_BODY_DONE:
     r->main->blocked++;
     r->aio = 1;
     return NGX_DONE;
-#endif
 single_thread:
+#endif
     lcf->_handler(new_ctx);
     if (lcf->_is_call_to_var) {
         return NGX_DECLINED;
     }
     ngx_http_c_func_output_filter(r);
+#if (nginx_version > 1013003)
     return NGX_DONE;
+#else
+    return NGX_OK;
+#endif
 } /* ngx_http_c_func_precontent_handler */
 
 

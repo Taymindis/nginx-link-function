@@ -32,6 +32,11 @@
 * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+
+
+#ifndef _NGX_C_FUNC_APP_H_INCLUDED_
+#define _NGX_C_FUNC_APP_H_INCLUDED_
+
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -55,7 +60,6 @@ typedef struct {
 	void* __r__;
 	void* __pl__;
 	void* __log__;
-	intptr_t __rc__;
 } ngx_http_c_func_ctx_t;
 
 extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
@@ -85,6 +89,17 @@ extern void ngx_http_c_func_write_resp(
     const char* resp_content
 );
 
+extern void ngx_http_c_func_write_resp_l(
+    ngx_http_c_func_ctx_t *ctx,
+    uintptr_t status_code,
+    const char* status_line,
+    size_t status_line_len,
+    const char* content_type,
+    size_t content_type_len,
+    const char* resp_content,
+    size_t resp_content_len);
+
+
 extern void ngx_http_c_func_set_resp_var(
     ngx_http_c_func_ctx_t *ctx,
     const char* resp_content
@@ -102,3 +117,5 @@ extern void* ngx_http_c_func_cache_get(void *shared_mem, const char* key);
 extern void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
 extern void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
 extern void* ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
+
+#endif /* _NGX_C_FUNC_APP_H_INCLUDED_ */

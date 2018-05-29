@@ -521,7 +521,11 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
         *h = ngx_http_c_func_rewrite_handler;
 
         /***Enable pre content phase for apps concurrent processing request layer, NGX_DONE and wait for finalize request ***/
+#if (nginx_version > 1013003)
         h = ngx_array_push(&cmcf->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
+#else
+        h = ngx_array_push(&cmcf->phases[NGX_HTTP_TRY_FILES_PHASE].handlers);
+#endif
         if (h == NULL) {
             return NGX_ERROR;
         }
@@ -937,7 +941,6 @@ ngx_http_c_func_precontent_handler(ngx_http_request_t *r) {
     ngx_http_c_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
     ngx_http_c_func_main_conf_t *mcf = ngx_http_get_module_main_conf(r, ngx_http_c_func_module);
     ngx_http_c_func_internal_ctx_t *internal_ctx;
-    ngx_http_core_loc_conf_t     *clcf;
 
     internal_ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
 
@@ -1071,6 +1074,7 @@ REQUEST_BODY_DONE:
 
 #if (NGX_THREADS)
     ngx_thread_pool_t         *tp;
+    ngx_http_core_loc_conf_t     *clcf;
 
     clcf  = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 

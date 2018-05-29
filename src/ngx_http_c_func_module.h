@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_9 9
+#define ngx_http_c_func_module_version_10 10
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"

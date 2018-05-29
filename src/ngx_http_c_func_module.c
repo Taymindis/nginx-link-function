@@ -577,6 +577,14 @@ ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
 
     cscfp = cmcf->servers.elts;
 
+#if (NGX_THREADS)
+#if(nginx_version > 1013003)
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, " enabled aio threads for c-function module ");
+#else
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, " upgrade to nginx 1.13.4 and above to enable aio threads for c-function module ");
+#endif
+#endif
+
     for (s = 0; s < cmcf->servers.nelts; s++) {
         ngx_http_core_srv_conf_t *cscf = cscfp[s];
         scf = cscf->ctx->srv_conf[ngx_http_c_func_module.ctx_index];

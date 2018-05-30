@@ -46,6 +46,7 @@ server {
 
 server {
   listen 8989;
+  aio threads;
   ...
   ngx_http_c_func_link_lib "/path/to/your/libcfuntest.so"; # sharing data memory with server 1 if the path are same with server 1
   ...
@@ -60,6 +61,7 @@ server {
 
 server {
   listen 8999;
+  aio threads;
   ...
   ngx_http_c_func_link_lib "/path/to/your/libcfuntest2.so"; # another application
   ...
@@ -75,6 +77,7 @@ server {
 
 server {
   listen 9888;
+  aio threads;
   ...
   ## Download application from cloud repo e.g. ngx_http_c_func_download_and_link_lib <download_link> <dest_link_file>
   ngx_http_c_func_download_and_link_lib "http://abc.com/repos/libcfuntest.so" "/etc/nginx/libcfuntest3.so"
@@ -91,6 +94,7 @@ server {
 
 server {
   listen 9898;
+  aio threads;
   ...
   ## Download application from cloud repo with extra header e.g. ngx_http_c_func_download_and_link_lib <download_link> <headers> <dest_link_file>
   ngx_http_c_func_download_and_link_lib "https://abc.com/repos/libcfuntest.so" "Accept-Language:en_US\r\nAuthorization:Bearer KA.eyJ2ZXJzaadlasdlaldhjHJ2h3ldjklsjaklcjkljasdklcmasaskdaJxdkL3ftjM\r\n" "/etc/nginx/libcfuntest4.so"

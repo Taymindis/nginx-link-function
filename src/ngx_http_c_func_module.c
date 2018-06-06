@@ -975,7 +975,7 @@ ngx_http_c_func_precontent_handler(ngx_http_request_t *r) {
 
 new_task:
     if (lcf->_handler == NULL) {
-        return NGX_HTTP_SERVICE_UNAVAILABLE;
+        return NGX_DECLINED;
     }
 
 

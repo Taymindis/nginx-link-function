@@ -183,7 +183,7 @@ void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
 void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
 void* ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
 void ngx_http_c_func_set_resp_var(ngx_http_c_func_ctx_t *ctx, const char* resp_content);
-void ngx_http_c_func_write_resp(ngx_http_c_func_ctx_t *ctx, uintptr_t status_code, const char* status_line, const char* content_type, const char* resp_content);
+void ngx_http_c_func_write_resp(ngx_http_c_func_ctx_t *ctx, uintptr_t status_code, const char* status_line, const char* content_type, const char* resp_content, size_t resp_len);
 void ngx_http_c_func_write_resp_l(ngx_http_c_func_ctx_t *ctx, uintptr_t status_code, const char* status_line,
                                   size_t status_line_len, const char* content_type, size_t content_type_len,
                                   const char* resp_content, size_t resp_content_len);
@@ -1060,12 +1060,13 @@ REQUEST_BODY_DONE:
                 args is %V\n \
                 extern is %V\n \
                 unparsed_uri is %V\n \
-                Size is %d\n \
-                Request body is %s", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri, len, buf);
+                Size is %zu", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri, len);
 
             new_ctx->req_body = buf;
+            new_ctx->req_body_len = len;
         } else {
             new_ctx->req_body = NULL;
+            new_ctx->req_body_len = 0;
         }
     } else { //if (!(r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH))) {
         if (ngx_http_discard_request_body(r) != NGX_OK) {
@@ -1078,6 +1079,7 @@ REQUEST_BODY_DONE:
                 extern is %V\n \
                 unparsed_uri is %V\n", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri);
         new_ctx->req_body = NULL;
+        new_ctx->req_body_len = 0;
     }
 
 #if (NGX_THREADS) && (nginx_version > 1013003)
@@ -1600,14 +1602,15 @@ ngx_http_c_func_write_resp(
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,
-    const char* resp_content
+    const char* resp_content,
+    size_t resp_len
 ) {
     ngx_http_c_func_write_resp_l(appctx, status_code,
                                  status_line, status_line ? ngx_strlen(status_line) : 0,
                                  content_type,
                                  content_type ? ngx_strlen(content_type) : 0,
                                  resp_content,
-                                 resp_content ? ngx_strlen(resp_content) : 0
+                                 resp_len
                                 );
 }
 

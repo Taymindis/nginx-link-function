@@ -55,6 +55,7 @@ typedef struct {
 	char *req_args; // Uri Args
 	u_char *req_body; // Request Body
 	void *shared_mem;
+	size_t req_body_len; // length of body, including terminating \0
 
 	/* internal */
 	void* __r__;
@@ -86,7 +87,8 @@ extern void ngx_http_c_func_write_resp(
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,
-    const char* resp_content
+    const char* resp_content,
+    size_t resp_len
 );
 
 extern void ngx_http_c_func_write_resp_l(

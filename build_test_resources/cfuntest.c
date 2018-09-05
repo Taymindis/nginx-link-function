@@ -26,12 +26,14 @@ void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx) {
 void my_app_simple_get_greeting(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get");
 
+    char *rep = "greeting from ngx_http_c_func testing";
     ngx_http_c_func_write_resp(
         ctx,
         200,
         "200 OK",
         "text/plain",
-        "greeting from ngx_http_c_func testing"
+        rep,
+        strlen(rep)
     );
 }
 
@@ -45,7 +47,8 @@ void my_app_simple_get_args(ngx_http_c_func_ctx_t *ctx) {
         200,
         "200 OK",
         "text/plain",
-        ctx->req_args
+        ctx->req_args,
+        strlen(ctx->req_args)
     );
 }
 
@@ -61,7 +64,8 @@ void my_app_simple_get_calloc_from_pool(ngx_http_c_func_ctx_t *ctx) {
         200,
         "200 OK",
         "text/plain",
-        my_log_message
+        my_log_message,
+        strlen(my_log_message)
     );
 }
 
@@ -76,7 +80,8 @@ void my_app_simple_get_header_param(ngx_http_c_func_ctx_t *ctx) {
             200,
             "200 OK",
             "text/plain",
-            req_content_type
+            req_content_type,
+            strlen(req_content_type)
         );
     }
 }
@@ -86,12 +91,14 @@ void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
 
     char * tokenArgs = ngx_http_c_func_get_query_param(ctx, "token");
     if (! tokenArgs) {
+        char *resp = "Token Not Found";
         ngx_http_c_func_write_resp(
             ctx,
             401,
             "401 unauthorized",
             "text/plain",
-            "Token Not Found"
+            resp,
+            strlen(resp)
         );
     } else {
         ngx_http_c_func_write_resp(
@@ -99,7 +106,8 @@ void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
             401,
             "401 unauthorized",
             "text/plain",
-            tokenArgs
+            tokenArgs,
+            strlen(tokenArgs)
         );
     }
 }
@@ -110,12 +118,14 @@ void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
     if (!ctx->req_body) {
         ngx_http_c_func_log_info(ctx, "no request body");
 
+        char *resp = "\n";
         ngx_http_c_func_write_resp(
             ctx,
             202,
             "202 Accepted and Processing",
             "text/plain",
-            "\n"
+            resp,
+            strlen(resp)
         );
     } else {
 
@@ -124,7 +134,8 @@ void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
             202,
             "202 Accepted and Processing",
             "text/plain",
-            ctx->req_body
+            ctx->req_body,
+            strlen(ctx->req_body)
         );
     }
 }
@@ -140,7 +151,8 @@ void my_app_simple_get_cache(ngx_http_c_func_ctx_t *ctx) {
             200,
             "200 OK",
             "text/plain",
-            (char*)my_cache_value
+            my_cache_value,
+            strlen(my_cache_value)
         );
     }
 }

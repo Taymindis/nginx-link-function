@@ -1626,14 +1626,14 @@ ngx_http_c_func_output_filter(
 
     internal_ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
 
-    if (internal_ctx->rc == NGX_HTTP_INTERNAL_SERVER_ERROR) {
-        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Apps Internal Server error");
+    if (internal_ctx == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Session is not valid");
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
 
-    if (internal_ctx == NULL) {
-        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Session is not valid");
+    if (internal_ctx->rc == NGX_HTTP_INTERNAL_SERVER_ERROR) {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Apps Internal Server error");
         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
         return;
     }

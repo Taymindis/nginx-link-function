@@ -27,6 +27,7 @@ void my_app_simple_get_greeting(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get");
 
     char *rep = "greeting from ngx_http_c_func testing";
+    // sleep(4); uncomment for testing aio threads
     ngx_http_c_func_write_resp(
         ctx,
         200,
@@ -134,8 +135,8 @@ void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
             202,
             "202 Accepted and Processing",
             "text/plain",
-            ctx->req_body,
-            strlen(ctx->req_body)
+            ctx->req_body,            
+            ctx->req_body_len
         );
     }
 }

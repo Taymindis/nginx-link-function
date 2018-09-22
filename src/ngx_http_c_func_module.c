@@ -134,7 +134,7 @@ static ngx_int_t ngx_http_c_func_get_resp_var(ngx_http_request_t *r, ngx_http_va
 static void ngx_http_c_func_set_resp_var_with_r(ngx_http_request_t *r, ngx_http_c_func_ctx_t *ctx, const char* resp_content);
 static void ngx_http_c_func_output_filter(ngx_http_request_t *r);
 
-#if (NGX_THREADS) && (nginx_version > 1013003)
+#if (NGX_THREADS)
 static void ngx_http_c_func_after_process(ngx_event_t *ev);
 static void ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log);
 #endif
@@ -524,7 +524,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 #if (nginx_version > 1013003)
         h = ngx_array_push(&cmcf->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
 #else  /**Access Phase is the only last phase for multi thread**/
-        h = ngx_array_push(&cmcf->phases[NGX_HTTP_CONTENT_PHASE].handlers);
+        h = ngx_array_push(&cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers);
 #endif
         if (h == NULL) {
             return NGX_ERROR;
@@ -535,7 +535,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 
     /*** Default Init for shm with 1M if pool is empty***/
     if (mcf != NULL && !mcf->is_cache_defined ) {
-        ngx_conf_log_error(NGX_LOG_INFO, cf,   0, "%s", "Init Default Share memory with 1k");
+        ngx_conf_log_error(NGX_LOG_INFO, cf,   0, "%s", "Init Default Share memory with 1M");
         ngx_str_t default_size = ngx_string("1M");
 
         ngx_shm_zone_t *shm_zone = ngx_shared_memory_add(cf, &mcf->shm_ctx->name, ngx_parse_size(&default_size), &ngx_http_c_func_module);
@@ -554,7 +554,7 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 static ngx_int_t
 ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
-#ifndef ngx_http_c_func_module_version_10
+#ifndef ngx_http_c_func_module_version_11
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -578,11 +578,7 @@ ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
     cscfp = cmcf->servers.elts;
 
 #if (NGX_THREADS)
-#if(nginx_version > 1013003)
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, " enabled aio threads for c-function module ");
-#else
-    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, " upgrade to nginx 1.13.4 and above to enable aio threads for c-function module ");
-#endif
 #endif
 
     for (s = 0; s < cmcf->servers.nelts; s++) {
@@ -895,7 +891,7 @@ ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     return NGX_CONF_OK;
 }
 
-#if (NGX_THREADS) && (nginx_version > 1013003)
+#if (NGX_THREADS)
 static void
 ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log)
 {
@@ -1040,7 +1036,7 @@ new_task:
             for (cl = r->request_body->bufs; cl; cl = cl->next) {
                 p = ngx_copy(p, cl->buf->pos, cl->buf->last - cl->buf->pos);
             }
-            buf[len] = '\0';
+            // buf[len] = '\0';
 
         } else {
             b = r->request_body->bufs->buf;
@@ -1049,7 +1045,7 @@ new_task:
             }
             buf = ngx_palloc(r->pool, (len + 1) );
             ngx_memcpy(buf, b->pos, len);
-            buf[len] = '\0';
+            // buf[len] = '\0';
         }
         /************End REading ****************/
 
@@ -1082,7 +1078,7 @@ REQUEST_BODY_DONE:
         new_ctx->req_body_len = 0;
     }
 
-#if (NGX_THREADS) && (nginx_version > 1013003)
+#if (NGX_THREADS)
     ngx_thread_pool_t         *tp;
     ngx_http_core_loc_conf_t     *clcf;
 
@@ -1114,11 +1110,8 @@ single_thread:
         return NGX_DECLINED;
     }
     ngx_http_c_func_output_filter(r);
-#if (nginx_version > 1013003)
+    
     return NGX_DONE;
-#else
-    return NGX_OK;
-#endif
 } /* ngx_http_c_func_precontent_handler */
 
 

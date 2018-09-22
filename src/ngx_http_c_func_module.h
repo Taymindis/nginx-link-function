@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_10 10
+#define ngx_http_c_func_module_version_11 11
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -54,8 +54,8 @@
 typedef struct {
 	char *req_args; // Uri Args
 	u_char *req_body; // Request Body
+    size_t req_body_len; // length of body
 	void *shared_mem;
-	size_t req_body_len; // length of body, including terminating \0
 
 	/* internal */
 	void* __r__;

@@ -54,6 +54,23 @@ fi
 # have=NGX_HTTP_C_FUN_SSL . auto/have
 # fi
 
+# with dlfcn feature 
+ngx_feature="ngx_http_c_func_compatibility"
+ngx_feature_name="NGX_HAVE_HTTP_C_FUNC_COMPATIBLITY"
+ngx_feature_run=no
+ngx_feature_incs="#include <dlfcn.h>"
+ngx_feature_path=
+ngx_feature_libs="-ldl"
+# ngx_feature_exit_if_not_found=yes
+ngx_feature_test="void * pt = dlopen(NULL, RTLD_LAZY | RTLD_NOW);"
+. auto/feature
+
+if [ $ngx_found != yes ]; then
+echo "nginx version not support this module, please make sure nginx version is 1.10 and above"
+echo
+exit 1
+fi
+
 
 if test -n "$ngx_module_link"; then
     ngx_module_type=HTTP
@@ -61,11 +78,13 @@ if test -n "$ngx_module_link"; then
     ngx_module_deps="$HTTP_C_FUNC_DEPS"
     ngx_module_srcs="$HTTP_C_FUNC_SRCS"
     #ngx_module_libs=" -rdynamic -ldl -lpthread -lpcre -Wl,-E"
-    ngx_module_libs="-ldl -lm -lpthread -lpcre"
+    # ngx_module_libs="-ldl"
     #ngx_module_libs="-lunwind-coredump -lunwind-generic -lunwind-ptrace -lunwind"
     
     . auto/module
 else
+  # CORE_INCS="$CORE_INCS $ngx_feature_path"
+  # CORE_LIBS="$CORE_LIBS -ldl"
   HTTP_MODULES="$HTTP_MODULES ngx_http_c_func_module"
   NGX_ADDON_SRCS="$NGX_ADDON_SRCS $HTTP_C_FUNC_SRCS"
   NGX_ADDON_DEPS="$NGX_ADDON_DEPS $HTTP_C_FUNC_DEPS"

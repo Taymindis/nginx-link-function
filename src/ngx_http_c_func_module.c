@@ -554,6 +554,11 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
 static ngx_int_t
 ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
 
+#if (nginx_version < 1010003)
+    ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "nginx-c-function is not support nginx version below 1.10");
+    return NGX_ERROR;
+#endif
+
 #ifndef ngx_http_c_func_module_version_11
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
@@ -1110,7 +1115,7 @@ single_thread:
         return NGX_DECLINED;
     }
     ngx_http_c_func_output_filter(r);
-    
+
     return NGX_DONE;
 } /* ngx_http_c_func_precontent_handler */
 

@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_11 11
+#define ngx_http_c_func_module_version_12 12
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -104,7 +104,8 @@ extern void ngx_http_c_func_write_resp_l(
 
 extern void ngx_http_c_func_set_resp_var(
     ngx_http_c_func_ctx_t *ctx,
-    const char* resp_content
+    const char* resp_content,
+    size_t resp_len
 );
 
 // Shared Memory and Cache Scope

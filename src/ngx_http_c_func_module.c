@@ -131,7 +131,7 @@ static ngx_int_t ngx_http_c_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_htt
 static u_char* ngx_http_c_func_strdup_with_p(ngx_pool_t *pool, const char *src, size_t len);
 
 static ngx_int_t ngx_http_c_func_get_resp_var(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
-static void ngx_http_c_func_set_resp_var_with_r(ngx_http_request_t *r, ngx_http_c_func_ctx_t *ctx, const char* resp_content);
+static void ngx_http_c_func_set_resp_var_with_r(ngx_http_request_t *r, ngx_http_c_func_ctx_t *ctx, const char* resp_content, size_t resp_len);
 static void ngx_http_c_func_output_filter(ngx_http_request_t *r);
 
 #if (NGX_THREADS)
@@ -182,7 +182,7 @@ void* ngx_http_c_func_cache_get(void *shared_mem, const char* key);
 void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
 void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
 void* ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
-void ngx_http_c_func_set_resp_var(ngx_http_c_func_ctx_t *ctx, const char* resp_content);
+void ngx_http_c_func_set_resp_var(ngx_http_c_func_ctx_t *ctx, const char* resp_content, size_t resp_len);
 void ngx_http_c_func_write_resp(ngx_http_c_func_ctx_t *ctx, uintptr_t status_code, const char* status_line, const char* content_type, const char* resp_content, size_t resp_len);
 void ngx_http_c_func_write_resp_l(ngx_http_c_func_ctx_t *ctx, uintptr_t status_code, const char* status_line,
                                   size_t status_line_len, const char* content_type, size_t content_type_len,
@@ -559,7 +559,7 @@ ngx_http_c_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_ERROR;
 #endif
 
-#ifndef ngx_http_c_func_module_version_11
+#ifndef ngx_http_c_func_module_version_12
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the latest ngx_http_c_func_module.h not found in the c header path, \
         please copy latest ngx_http_c_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -1486,15 +1486,16 @@ ngx_http_c_func_get_resp_var(ngx_http_request_t *r,
 void
 ngx_http_c_func_set_resp_var(
     ngx_http_c_func_ctx_t *ctx,
-    const char* resp_content
+    const char* resp_content,
+    size_t      resp_len
 ) {
     ngx_http_c_func_internal_ctx_t *internal_ctx;
     ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
     internal_ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
 
     if (internal_ctx != NULL) {
-        internal_ctx->resp_len = ngx_strlen(resp_content);
-        internal_ctx->resp = ngx_http_c_func_strdup_with_p(r->pool, resp_content, internal_ctx->resp_len);
+        internal_ctx->resp_len = resp_len;
+        internal_ctx->resp = ngx_http_c_func_strdup_with_p(r->pool, resp_content, resp_len);
 
         /** Decline means continue to next handler for this phase **/
         internal_ctx->rc = NGX_DECLINED;
@@ -1508,14 +1509,15 @@ static void
 ngx_http_c_func_set_resp_var_with_r(
     ngx_http_request_t *r,
     ngx_http_c_func_ctx_t *ctx,
-    const char* resp_content
+    const char* resp_content,
+    size_t      resp_len
 ) {
     ngx_http_c_func_internal_ctx_t *internal_ctx;
     internal_ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
 
     if (internal_ctx != NULL) {
-        internal_ctx->resp_len = ngx_strlen(resp_content);
-        internal_ctx->resp = ngx_http_c_func_strdup_with_p(r->pool, resp_content, internal_ctx->resp_len);
+        internal_ctx->resp_len = resp_len;
+        internal_ctx->resp = ngx_http_c_func_strdup_with_p(r->pool, resp_content, resp_len);
 
         /** Decline means continue to next handler for this phase **/
         internal_ctx->rc = NGX_DECLINED;
@@ -1545,9 +1547,8 @@ ngx_http_c_func_write_resp_l(
     if ( ((ngx_http_c_func_loc_conf_t*) ngx_http_get_module_loc_conf(r, ngx_http_c_func_module) )->_is_call_to_var ) {
         ngx_log_error(NGX_LOG_WARN,
                       r->connection->log,
-                      0, "Recommended to call ngx_http_c_func_set_resp_var. \
-                      ngx_http_c_func_write_resp only applicable when no variable specified");
-        ngx_http_c_func_set_resp_var_with_r(r, appctx, resp_content);
+                      0, "Recommended to call ngx_http_c_func_set_resp_var. ngx_http_c_func_write_resp only applicable when no variable specified");
+        ngx_http_c_func_set_resp_var_with_r(r, appctx, resp_content, resp_content_len);
         return;
     }
 

@@ -12,6 +12,7 @@ Table of Contents
 * [Installation](#installation)
 * [Sample Application Development](#sample-application-development)
 * [Test](#test)
+* [Wiki](#wiki)
 * [Support](#support)
 * [Copyright & License](#copyright--license)
 
@@ -386,6 +387,11 @@ Support
 =======
 
 Please do not hesitate to contact minikawoon2017@gmail.com/minikawoon99@gmail.com for any queries.
+
+Wiki
+====
+
+Check out [wiki](https://github.com/Taymindis/nginx-c-function/wiki) for more details
 
 
 [Back to TOC](#table-of-contents)

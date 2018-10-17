@@ -155,11 +155,13 @@ This is the interface that you can use to get more details from nginx server, it
 typedef struct {
   char *req_args; // Uri Args
   u_char *req_body; // Request Body
+  size_t req_body_len; // length of body
+  void *shared_mem;
 
   /* internal */
   void* __r__;
+  void* __pl__;
   void* __log__;
-  intptr_t __rc__;
 } ngx_http_c_func_ctx_t;
 
 extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);

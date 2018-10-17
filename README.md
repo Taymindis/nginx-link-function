@@ -388,7 +388,9 @@ sudo prove -r t/
 Support
 =======
 
-Please do not hesitate to contact minikawoon2017@gmail.com/minikawoon99@gmail.com for any queries.
+Please raise an [issue](https://github.com/Taymindis/nginx-c-function/issues) and I will fixed it as soon as I can
+
+Alternatively, you may email to minikawoon2017@gmail.com
 
 Wiki
 ====

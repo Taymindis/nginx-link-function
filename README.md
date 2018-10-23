@@ -177,8 +177,10 @@ extern void ngx_http_c_func_write_resp(
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,
-    const char* resp_content
+    const char* resp_content,
+    size_t resp_len
 );
+
 
 // Shared Memory and Cache Scope
 extern void ngx_http_c_func_shmtx_lock(void *shared_mem);
@@ -220,6 +222,11 @@ extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const c
 ctx->req_body;
 ```
 
+#### get the request body length
+```c
+ctx->req_body_len;
+```
+
 #### loggin to nginx server
 ```c
 extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
@@ -235,7 +242,8 @@ extern void ngx_http_c_func_write_resp(
     uintptr_t status_code, // Status code
     const char* status_line, // Status line
     const char* content_type, // Response content type
-    const char* resp_content // Response content
+    const char* resp_content, // Response content
+    size_t resp_len // Response content length
 );
 ```
 
@@ -319,6 +327,7 @@ void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
         202,
         "202 Accepted and Processing",
         "text/plain",
+        ctx->req_body,
         ctx->req_body
     );
 }

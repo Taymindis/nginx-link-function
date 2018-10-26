@@ -523,14 +523,29 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
         /***Enable pre content phase for apps concurrent processing request layer, NGX_DONE and wait for finalize request ***/
 #if (nginx_version > 1013003)
         h = ngx_array_push(&cmcf->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
-#else  /**Access Phase is the only last phase for multi thread**/
-        h = ngx_array_push(&cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers);
-#endif
         if (h == NULL) {
             return NGX_ERROR;
         }
 
         *h = ngx_http_c_func_precontent_handler;
+#else
+        /**Access Phase is the only last phase for multi thread, we need to mimic to trick nginx c function access phase at first to register,
+            then it will be last to called as it is reverse order
+        **/
+        h = ngx_array_push(&cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers);
+        if (h == NULL) {
+            return NGX_ERROR;
+        }
+
+        h = cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers.elts;
+        ngx_uint_t i;
+        for (i = 0; i < cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers.nelts - 1; i++) {
+            h[i + 1] = h[i];
+        }
+
+        h[0] = ngx_http_c_func_precontent_handler;
+#endif
+
     }
 
     /*** Default Init for shm with 1M if pool is empty***/

@@ -921,8 +921,6 @@ ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log)
     ngx_http_c_func_loc_conf_t *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
 
     if (internal_ctx == NULL) {
-        internal_ctx->rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-        internal_ctx->processing = 0;
         ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "error while processing worker thread process");
         return;
     }
@@ -1099,6 +1097,7 @@ REQUEST_BODY_DONE:
     }
 
 #if (NGX_THREADS)
+    internal_ctx->processing = 1;
     ngx_thread_pool_t         *tp;
     ngx_http_core_loc_conf_t     *clcf;
 

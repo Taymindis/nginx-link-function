@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_http_c_func_module_version_12 12
+#define ngx_http_c_func_module_version_20 20
 
 
 #define ngx_http_c_func_content_type_plaintext "text/plain"
@@ -52,15 +52,15 @@
 
 
 typedef struct {
-	char *req_args; // Uri Args
-	u_char *req_body; // Request Body
+    char *req_args; // Uri Args
+    u_char *req_body; // Request Body
     size_t req_body_len; // length of body
-	void *shared_mem;
+    void *shared_mem;
 
-	/* internal */
-	void* __r__;
-	void* __pl__;
-	void* __log__;
+    /* internal */
+    void* __r__;
+    void* __pl__;
+    void* __log__;
 } ngx_http_c_func_ctx_t;
 
 extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
@@ -72,6 +72,8 @@ extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char
 extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
 extern void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
 extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+extern int ngx_http_c_func_add_header_in(ngx_http_c_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len );
+extern int ngx_http_c_func_add_header_out(ngx_http_c_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len );
 
 extern char *ngx_http_c_func_strdup(ngx_http_c_func_ctx_t *ctx, const char *src);
 
@@ -101,12 +103,6 @@ extern void ngx_http_c_func_write_resp_l(
     const char* resp_content,
     size_t resp_content_len);
 
-
-extern void ngx_http_c_func_set_resp_var(
-    ngx_http_c_func_ctx_t *ctx,
-    const char* resp_content,
-    size_t resp_len
-);
 
 // Shared Memory and Cache Scope
 extern uintptr_t ngx_http_c_func_shmtx_trylock(void *shared_mem);

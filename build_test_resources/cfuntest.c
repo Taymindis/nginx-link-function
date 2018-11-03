@@ -87,6 +87,35 @@ void my_app_simple_get_header_param(ngx_http_c_func_ctx_t *ctx) {
     }
 }
 
+void my_simple_extra_foo_header_input(ngx_http_c_func_ctx_t *ctx) {
+
+    ngx_http_c_func_add_header_in(ctx, "foo", sizeof("foo")-1, "foovalue", sizeof("foovalue")-1);
+
+    ngx_http_c_func_write_resp(
+        ctx,
+        200,
+        "200 OK",
+        "text/plain",
+        "Extra Header foo",
+        sizeof("Extra Header foo") - 1
+    );
+}
+
+void my_simple_extra_foo_header_output(ngx_http_c_func_ctx_t *ctx) {
+
+    ngx_http_c_func_add_header_out(ctx, "foo", sizeof("foo")-1, "foovalue", sizeof("foovalue")-1);
+
+    ngx_http_c_func_write_resp(
+        ctx,
+        200,
+        "200 OK",
+        "text/plain",
+        "Extra Header foo",
+        sizeof("Extra Header foo") - 1
+    );
+}
+
+
 void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log(info, ctx, "Calling back and log from my_app_simple_get_token_args");
 

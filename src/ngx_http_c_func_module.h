@@ -101,7 +101,8 @@ extern void ngx_http_c_func_write_resp_l(
     const char* content_type,
     size_t content_type_len,
     const char* resp_content,
-    size_t resp_content_len);
+    size_t resp_content_len
+);
 
 
 // Shared Memory and Cache Scope

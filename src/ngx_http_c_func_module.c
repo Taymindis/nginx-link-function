@@ -130,9 +130,13 @@ static u_char* ngx_http_c_func_strdup_with_p(ngx_pool_t *pool, const char *src, 
 
 // static ngx_int_t ngx_http_c_func_get_resp_var(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 // static void ngx_http_c_func_set_resp_var_with_r(ngx_http_request_t *r, ngx_http_c_func_ctx_t *ctx, const char* resp_content, size_t resp_len);
+#if (nginx_version > 1013003)
 static void ngx_http_c_func_output_filter(ngx_http_request_t *r);
+#else
+static ngx_int_t ngx_http_c_func_output_filter(ngx_http_request_t *r);
+#endif
 
-#if (NGX_THREADS)
+#if (NGX_THREADS && nginx_version > 1013003)
 static void ngx_http_c_func_after_process(ngx_event_t *ev);
 static void ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log);
 #endif
@@ -531,18 +535,20 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
         /**Access Phase is the only last phase for multi thread, we need to mimic to trick nginx c function access phase at first to register,
             then it will be last to called as it is reverse order
         **/
-        h = ngx_array_push(&cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers);
-        if (h == NULL) {
-            return NGX_ERROR;
-        }
+        h = ngx_array_push(&cmcf->phases[NGX_HTTP_CONTENT_PHASE].handlers);
+        // if (h == NULL) {
+        //     return NGX_ERROR;
+        // }
 
-        h = cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers.elts;
-        ngx_uint_t i;
-        for (i = 0; i < cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers.nelts - 1; i++) {
-            h[i + 1] = h[i];
-        }
+        // h = cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers.elts;
+        // ngx_uint_t i;
+        // for (i = 0; i < cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers.nelts - 1; i++) {
+        //     h[i + 1] = h[i];
+        // }
 
-        h[0] = ngx_http_c_func_precontent_handler;
+        // h[0] = ngx_http_c_func_precontent_handler;
+        *h = ngx_http_c_func_precontent_handler;
+
 #endif
 
     }
@@ -596,7 +602,7 @@ ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
 
     cscfp = cmcf->servers.elts;
 
-#if (NGX_THREADS)
+#if (NGX_THREADS && nginx_version > 1013003)
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, " enabled aio threads for c-function module ");
 #endif
 
@@ -909,7 +915,7 @@ ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     return NGX_CONF_OK;
 }
 
-#if (NGX_THREADS)
+#if (NGX_THREADS && nginx_version > 1013003)
 static void
 ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log)
 {
@@ -943,8 +949,18 @@ ngx_http_c_func_after_process(ngx_event_t *ev) {
     r->main->blocked--;
     r->aio = 0;
 
-    r->write_event_handler(r);
-    ngx_http_run_posted_requests(c);
+    if (r->done) {
+        /*
+         * trigger connection event handler if the subrequest was
+         * already finalized; this can happen if the handler is used
+         * for sendfile() in threads
+         */
+        c->write->handler(c->write);
+
+    } else {
+        r->write_event_handler(r);
+        ngx_http_run_posted_requests(c);
+    }
 }
 #endif
 
@@ -977,8 +993,12 @@ ngx_http_c_func_precontent_handler(ngx_http_request_t *r) {
     if (internal_ctx->aio_processing) {
         return NGX_AGAIN;
     } else {
+#if (nginx_version > 1013003)
         ngx_http_c_func_output_filter(r);
         return NGX_DONE;
+#else
+        return ngx_http_c_func_output_filter(r);
+#endif
     }
 
 new_task:
@@ -1090,7 +1110,7 @@ REQUEST_BODY_DONE:
         new_ctx->req_body_len = 0;
     }
 
-#if (NGX_THREADS)
+#if (NGX_THREADS && nginx_version > 1013003)
     internal_ctx->aio_processing = 1;
     ngx_thread_pool_t         *tp;
     ngx_http_core_loc_conf_t     *clcf;
@@ -1117,11 +1137,17 @@ REQUEST_BODY_DONE:
     r->aio = 1;
     return NGX_DONE;
 single_thread:
+#else
+    ngx_log_error(NGX_LOG_WARN, r->connection->log, 0, " nginx c function with nginx 1.13.3 and below is running single thread only, upgrade to nginx > 1.13.3 for concurrent request");
 #endif
     lcf->_handler(new_ctx);
+#if (nginx_version > 1013003)
     ngx_http_c_func_output_filter(r);
-
     return NGX_DONE;
+#else
+    return ngx_http_c_func_output_filter(r);
+#endif
+
 } /* ngx_http_c_func_precontent_handler */
 
 
@@ -1657,6 +1683,7 @@ ngx_http_c_func_write_resp(
                                 );
 }
 
+#if (nginx_version > 1013003)
 static void
 ngx_http_c_func_output_filter(
     ngx_http_request_t *r
@@ -1717,6 +1744,63 @@ ngx_http_c_func_output_filter(
     ngx_http_finalize_request(r, ngx_http_output_filter(r, &out)); // only using when request client body
     // rc = ngx_http_output_filter(r, &out);
 }
+#else
+static ngx_int_t
+ngx_http_c_func_output_filter(
+    ngx_http_request_t *r
+) {
+    // ngx_int_t rc;
+    ngx_chain_t out;
+    ngx_http_c_func_internal_ctx_t *internal_ctx;
+    ngx_str_t *resp_content_type, *resp_status_line;
+    ngx_buf_t *b;
+
+    internal_ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
+
+    if (internal_ctx == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Session is not valid");
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    if (internal_ctx->rc == NGX_HTTP_INTERNAL_SERVER_ERROR) {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Apps Internal Server error");
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    resp_status_line = &internal_ctx->status_line;
+    resp_content_type = &internal_ctx->content_type;
+    b = internal_ctx->resp_content;
+
+    r->headers_out.status = internal_ctx->status_code;
+
+    if (resp_status_line->len) {
+        r->headers_out.status_line.len = resp_status_line->len;
+        r->headers_out.status_line.data = resp_status_line->data;
+    }
+
+    /* Set the Content-Type header. */
+    r->headers_out.content_type.len = resp_content_type->len;
+    r->headers_out.content_type.data = resp_content_type->data;
+
+    /* Get the content length of the body. */
+    r->headers_out.content_length_n = ngx_buf_size(b);
+
+    /* Send the headers */
+    if ( ngx_http_send_header(r) == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "response processing failed.");
+        // ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Insertion in the buffer chain. */
+    out.buf = b;
+    out.next = NULL; /* just one buffer */
+
+    /* Send the body, and return the status code of the output filter chain. */
+    // ngx_http_finalize_request(r, ngx_http_output_filter(r, &out)); // only using when request client body
+    return ngx_http_output_filter(r, &out);
+}
+#endif
 
 /****Download Feature Support ****/
 static int

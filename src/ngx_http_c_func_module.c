@@ -970,9 +970,14 @@ ngx_http_c_func_after_process(ngx_event_t *ev) {
 static ngx_int_t
 ngx_http_c_func_precontent_handler(ngx_http_request_t *r) {
     // ngx_str_t                  name;
-    ngx_http_c_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
-    ngx_http_c_func_main_conf_t *mcf = ngx_http_get_module_main_conf(r, ngx_http_c_func_module);
-    ngx_http_c_func_internal_ctx_t *internal_ctx;
+    ngx_http_c_func_loc_conf_t      *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
+    ngx_http_c_func_main_conf_t     *mcf = ngx_http_get_module_main_conf(r, ngx_http_c_func_module);
+    ngx_http_c_func_internal_ctx_t  *internal_ctx;
+    ngx_http_c_func_ctx_t           *new_ctx;
+
+    if (lcf->_handler == NULL) {
+        return NGX_DECLINED;
+    }
 
     internal_ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
 
@@ -998,12 +1003,7 @@ ngx_http_c_func_precontent_handler(ngx_http_request_t *r) {
     }
 
 new_task:
-    if (lcf->_handler == NULL) {
-        return NGX_DECLINED;
-    }
-
-
-    ngx_http_c_func_ctx_t *new_ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_c_func_ctx_t));
+    new_ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_c_func_ctx_t));
     new_ctx->__r__ = r;
     new_ctx->__pl__ = r->pool;
     new_ctx->__log__ = r->connection->log;
@@ -1157,9 +1157,13 @@ single_thread:
  */
 static ngx_int_t
 ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
-    // ngx_http_c_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
+    ngx_http_c_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
     ngx_http_c_func_internal_ctx_t *ctx;
     ngx_int_t rc;
+
+    if (lcf->_handler == NULL) {
+        return NGX_DECLINED;
+    }
 
     if (r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH)) {
         // r->request_body_in_single_buf = 1;
@@ -1220,8 +1224,7 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
 }
 
 static void
-ngx_http_c_func_client_body_handler(ngx_http_request_t *r)
-{
+ngx_http_c_func_client_body_handler(ngx_http_request_t *r) {
     ngx_http_c_func_internal_ctx_t *ctx;
     ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
     ctx->done = 1;

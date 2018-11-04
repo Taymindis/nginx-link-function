@@ -87,11 +87,7 @@ typedef struct {
 typedef struct {
     unsigned done: 1;
     unsigned waiting_more_body: 1;
-
-    /*** For store Response ***/
-    size_t      resp_len;
-    u_char      *resp;
-    unsigned    aio_processing: 1;
+    unsigned aio_processing: 1;
 
     /**resp ctx**/
     uintptr_t status_code;
@@ -1186,7 +1182,6 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Insufficient Memory to create ngx_http_c_func_internal_ctx_t");
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
-        ctx->resp = NULL;
         ctx->rc = NGX_CONF_UNSET;
 
         ngx_http_set_ctx(r, ctx, ngx_http_c_func_module);
@@ -1217,7 +1212,6 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
                 ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Insufficient Memory to create ngx_http_c_func_internal_ctx_t");
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
-            ctx->resp = NULL;
             ctx->rc = NGX_CONF_UNSET;
             ngx_http_set_ctx(r, ctx, ngx_http_c_func_module);
         }

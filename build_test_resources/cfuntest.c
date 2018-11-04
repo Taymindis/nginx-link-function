@@ -11,15 +11,7 @@ int is_service_on = 0;
 void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx) {
     ngx_http_c_func_log(info, ctx, "%s", "Starting The Application");
 
-    char* my_cache_value = ngx_http_c_func_cache_new(ctx->shared_mem, "key", sizeof("This is cache value") + 1);
-
-    if (my_cache_value) {
-        memset(my_cache_value, 0, sizeof("This is cache value") + 1 );
-        strcpy(my_cache_value, "This is cache value");
-    }
-    
     is_service_on = 1;
-
 }
 
 
@@ -87,23 +79,49 @@ void my_app_simple_get_header_param(ngx_http_c_func_ctx_t *ctx) {
     }
 }
 
-void my_simple_extra_foo_header_input(ngx_http_c_func_ctx_t *ctx) {
+char* login(const char* userId, const char*pass) {
+    return "foo";
+}
 
-    ngx_http_c_func_add_header_in(ctx, "foo", sizeof("foo")-1, "foovalue", sizeof("foovalue")-1);
+void my_simple_authentication(ngx_http_c_func_ctx_t *ctx) {
 
-    ngx_http_c_func_write_resp(
-        ctx,
-        200,
-        "200 OK",
-        "text/plain",
-        "Extra Header foo",
-        sizeof("Extra Header foo") - 1
-    );
+    ngx_http_c_func_log_info(ctx, "Authenticating");
+    char *userId = (char*) ngx_http_c_func_get_header(ctx, "userId");
+    char *userPass = (char*) ngx_http_c_func_get_header(ctx, "userPass");
+    char* userName;
+
+    if ( userId == NULL || strlen(userId) == 0) {
+AUTH_FAILED:
+        ngx_http_c_func_write_resp(
+            ctx,
+            403,
+            "403 Authenthication Failed",
+            "text/plain",
+            "",
+            0
+        );
+    } else {
+        userName = login(userId, userPass);
+        /** Add input header for downstream response **/
+        if (userName) {
+            ngx_http_c_func_add_header_in(ctx, "userName", sizeof("userName")-1, userName, strlen(userName));
+        } else {
+            goto AUTH_FAILED;
+        }
+
+        ngx_http_c_func_write_resp(
+            ctx,
+            200,
+            "200 OK",
+            "text/plain",
+            "OK",
+            sizeof("OK")-1
+        );
+    }
 }
 
 void my_simple_extra_foo_header_output(ngx_http_c_func_ctx_t *ctx) {
-
-    ngx_http_c_func_add_header_out(ctx, "foo", sizeof("foo")-1, "foovalue", sizeof("foovalue")-1);
+    ngx_http_c_func_add_header_out(ctx, "foo", sizeof("foo") - 1, "foovalue", sizeof("foovalue") - 1);
 
     ngx_http_c_func_write_resp(
         ctx,
@@ -164,11 +182,34 @@ void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
             202,
             "202 Accepted and Processing",
             "text/plain",
-            ctx->req_body,            
+            ctx->req_body,
             ctx->req_body_len
         );
     }
 }
+
+void my_app_simple_set_cache(ngx_http_c_func_ctx_t *ctx) {
+    ngx_http_c_func_log_info(ctx, "logged from my_app_simple_set_cache");
+
+    char* my_cache_value = ngx_http_c_func_cache_new(ctx->shared_mem, "key", sizeof("This is cache value") + 1);
+
+    if (my_cache_value) {
+        memset(my_cache_value, 0, sizeof("This is cache value") + 1 );
+        strcpy(my_cache_value, "This is cache value");
+    }
+
+    if (my_cache_value) {
+        ngx_http_c_func_write_resp(
+            ctx,
+            200,
+            "200 OK",
+            "text/plain",
+            "OK",
+            sizeof("OK") - 1
+        );
+    }
+}
+
 
 void my_app_simple_get_cache(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(ctx, "logged from my_app_simple_get_cache");
@@ -189,7 +230,6 @@ void my_app_simple_get_cache(ngx_http_c_func_ctx_t *ctx) {
 
 void my_app_simple_get_no_resp(ngx_http_c_func_ctx_t *ctx) {
     ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get_no_resp");
-
 
 }
 

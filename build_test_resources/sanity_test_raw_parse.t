@@ -4,6 +4,10 @@ use lib 'inc';
 use lib 'lib';
 use Test::Nginx::Socket 'no_plan';
 
+our $main_conf = <<'_EOC_';
+    thread_pool my_thread_pool threads=8 max_queue=8;
+_EOC_
+
 no_long_string();
 
 run_tests();
@@ -77,6 +81,7 @@ qr/QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc
 --- config
 ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location = /testCFUNCERRORRESP {
+    error_log /dev/null;
     ngx_http_c_func_call "my_app_simple_get_no_resp";
 }
 --- request
@@ -119,22 +124,64 @@ qr/greeting=enjoy-http-c-function-testing$/
 
 === TEST 8: Set C_FUNC_TEST_CACHE
 --- config
-ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
 location = /testCFunGetCache {
     ngx_http_c_func_call "my_app_simple_get_cache";
 }
+location = /testCFunSetCache {
+    ngx_http_c_func_call "my_app_simple_set_cache";
+}
+--- pipelined_requests eval
+["POST /testCFunSetCache", "GET /testCFunGetCache"]
+--- response_body eval
+["OK", "This is cache value"]
+
+
+=== TEST 9: Test output headers
+--- config
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /ext_header_foo {
+    ngx_http_c_func_call "my_simple_extra_foo_header_output";
+}
 --- request
-POST /testCFunGetCache
+GET /ext_header_foo
 --- error_code: 200
 --- response_headers
-Content-Type: text/plain
---- response_body_like eval
-qr/This is cache value$/
+foo: foovalue
 
 
-=== TEST 9: Set C_FUNC_AIO_THREADS_TEST
+
+=== TEST 10: Authentication
 --- config
-aio threads;
+ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+location /backend {
+    return 200 "Welcome ${arg_userName}";
+}
+location = /auth {
+    internal;
+    ngx_http_c_func_call "my_simple_authentication";
+}
+location = /my_simple_authentication {
+  auth_request /auth;
+  proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
+}
+--- request
+GET /my_simple_authentication
+--- more_headers
+userId:foo
+userPass:asdasds
+--- error_code: 200
+--- response_body_like eval
+qr/Welcome foo$/
+
+
+# Test Suite below is aio threads
+
+
+=== TEST 11: Set C_FUNC_TEST_1
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
 ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location = /testCFunGreeting {
     ngx_http_c_func_call "my_app_simple_get_greeting";
@@ -148,9 +195,130 @@ Content-Type: text/plain
 qr/greeting from ngx_http_c_func testing$/
 
 
-=== TEST 10: Test output headers
+=== TEST 12: Set C_FUNC_TEST_ARGS
+--- main_config eval: $::main_conf
 --- config
-aio threads;
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFunARGS {
+    ngx_http_c_func_call "my_app_simple_get_args";
+}
+--- request
+GET /testCFunARGS?greeting=hello_nginx?id=129310923
+--- error_code: 200
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/greeting=hello_nginx\?id=129310923$/
+
+
+=== TEST 13: Set C_FUNC_TEST_POST_NONE
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFunPOSTBody {
+    ngx_http_c_func_call "my_app_simple_post";
+}
+--- request
+POST /testCFunPOSTBody
+" "
+--- error_code: 202
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/\s/
+
+
+=== TEST 14: Set C_FUNC_TEST_GET_TOKEN
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFunCVerifyToken {
+    ngx_http_c_func_call "my_app_simple_get_token_args";
+}
+--- request
+GET /testCFunCVerifyToken?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==
+--- error_code: 401
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==$/
+
+
+=== TEST 15: Set C_FUNC_TEST_GET_ERROR_RESP
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFUNCERRORRESP {
+    error_log /dev/null;
+    ngx_http_c_func_call "my_app_simple_get_no_resp";
+}
+--- request
+GET /testCFUNCERRORRESP?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==
+--- error_code: 500
+--- response_headers
+Content-Type: text/html
+
+
+=== TEST 16: Set C_FUNC_TEST_GET_CALLOC_FROM_POOL
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFUNCCallocFromPool {
+    ngx_http_c_func_call "my_app_simple_get_calloc_from_pool";
+}
+--- request
+GET /testCFUNCCallocFromPool
+--- error_code: 200
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/This is the message calloc from pool$/
+
+
+=== TEST 17: Set C_FUNC_TEST_POST_BODY
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
+location = /testCFunPOSTBody {
+    ngx_http_c_func_call "my_app_simple_post";
+}
+--- request
+POST /testCFunPOSTBody
+greeting=enjoy-http-c-function-testing
+--- error_code: 202
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/greeting=enjoy-http-c-function-testing$/
+
+
+=== TEST 18: Set C_FUNC_TEST_CACHE
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+location = /testCFunGetCache {
+    ngx_http_c_func_call "my_app_simple_get_cache";
+}
+location = /testCFunSetCache {
+    ngx_http_c_func_call "my_app_simple_set_cache";
+}
+--- pipelined_requests eval
+["POST /testCFunSetCache", "GET /testCFunGetCache"]
+--- response_body eval
+["OK", "This is cache value"]
+
+
+=== TEST 19: output headers
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
 ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location = /ext_header_foo {
     ngx_http_c_func_call "my_simple_extra_foo_header_output";
@@ -160,4 +328,31 @@ GET /ext_header_foo
 --- error_code: 200
 --- response_headers
 foo: foovalue
+
+
+
+=== TEST 20: Authentication
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+location /backend {
+    return 200 "Welcome ${arg_userName}";
+}
+location = /auth {
+    internal;
+    ngx_http_c_func_call "my_simple_authentication";
+}
+location = /my_simple_authentication {
+  auth_request /auth;
+  proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
+}
+--- request
+GET /my_simple_authentication
+--- more_headers
+userId:foo
+userPass:asdasds
+--- error_code: 200
+--- response_body_like eval
+qr/Welcome foo$/
 

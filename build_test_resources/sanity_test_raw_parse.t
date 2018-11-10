@@ -151,7 +151,7 @@ foo: foovalue
 
 
 
-=== TEST 10: Authentication
+=== TEST 10: Authentication with nginx c function header
 --- config
 ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
 location /backend {
@@ -161,7 +161,31 @@ location = /auth {
     internal;
     ngx_http_c_func_call "my_simple_authentication";
 }
-location = /my_simple_authentication {
+location = /my_simple_authentication {  
+  ngx_http_c_func_add_req_header userId $arg_userId;
+  ngx_http_c_func_add_req_header userPass $arg_userPass;
+  auth_request /auth;
+  proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
+}
+--- request
+GET /my_simple_authentication?userId=foo&userPass=xxxx
+--- error_code: 200
+--- response_body_like eval
+qr/Welcome foo$/
+
+
+
+=== TEST 11: Authentication with nginx c function header
+--- config
+ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+location /backend {
+    return 200 "Welcome ${arg_userName}";
+}
+location = /auth {
+    internal;
+    ngx_http_c_func_call "my_simple_authentication";
+}
+location = /my_simple_authentication {  
   auth_request /auth;
   proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
 }
@@ -178,7 +202,7 @@ qr/Welcome foo$/
 # Test Suite below is aio threads
 
 
-=== TEST 11: Set C_FUNC_TEST_1
+=== TEST 21: aio threads Set C_FUNC_TEST_1
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -195,7 +219,7 @@ Content-Type: text/plain
 qr/greeting from ngx_http_c_func testing$/
 
 
-=== TEST 12: Set C_FUNC_TEST_ARGS
+=== TEST 22: aio threads Set C_FUNC_TEST_ARGS
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -212,7 +236,7 @@ Content-Type: text/plain
 qr/greeting=hello_nginx\?id=129310923$/
 
 
-=== TEST 13: Set C_FUNC_TEST_POST_NONE
+=== TEST 23: aio threads Set C_FUNC_TEST_POST_NONE
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -230,7 +254,7 @@ Content-Type: text/plain
 qr/\s/
 
 
-=== TEST 14: Set C_FUNC_TEST_GET_TOKEN
+=== TEST 24: aio threads Set C_FUNC_TEST_GET_TOKEN
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -247,7 +271,7 @@ Content-Type: text/plain
 qr/QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==$/
 
 
-=== TEST 15: Set C_FUNC_TEST_GET_ERROR_RESP
+=== TEST 25: aio threads Set C_FUNC_TEST_GET_ERROR_RESP
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -263,7 +287,7 @@ GET /testCFUNCERRORRESP?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2
 Content-Type: text/html
 
 
-=== TEST 16: Set C_FUNC_TEST_GET_CALLOC_FROM_POOL
+=== TEST 26: aio threads Set C_FUNC_TEST_GET_CALLOC_FROM_POOL
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -280,7 +304,7 @@ Content-Type: text/plain
 qr/This is the message calloc from pool$/
 
 
-=== TEST 17: Set C_FUNC_TEST_POST_BODY
+=== TEST 27: aio threads Set C_FUNC_TEST_POST_BODY
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -298,7 +322,7 @@ Content-Type: text/plain
 qr/greeting=enjoy-http-c-function-testing$/
 
 
-=== TEST 18: Set C_FUNC_TEST_CACHE
+=== TEST 28: aio threads Set C_FUNC_TEST_CACHE
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -315,7 +339,7 @@ location = /testCFunSetCache {
 ["OK", "This is cache value"]
 
 
-=== TEST 19: output headers
+=== TEST 29: aio threads output headers
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -331,7 +355,33 @@ foo: foovalue
 
 
 
-=== TEST 20: Authentication
+=== TEST 30: aio threads Authentication with nginx c function header
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+location /backend {
+    return 200 "Welcome ${arg_userName}";
+}
+location = /auth {
+    internal;
+    ngx_http_c_func_call "my_simple_authentication";
+}
+location = /my_simple_authentication {  
+  ngx_http_c_func_add_req_header userId $arg_userId;
+  ngx_http_c_func_add_req_header userPass $arg_userPass;
+  auth_request /auth;
+  proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
+}
+--- request
+GET /my_simple_authentication?userId=foo&userPass=xxxx
+--- error_code: 200
+--- response_body_like eval
+qr/Welcome foo$/
+
+
+
+=== TEST 31: aio threads Authentication with client header
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;

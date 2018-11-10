@@ -79,8 +79,14 @@ typedef struct {
 } ngx_http_c_func_srv_conf_t;
 
 typedef struct {
-    ngx_str_t _method_name;
+    ngx_str_t key;
+    ngx_http_complex_value_t   value;
+} ngx_http_c_func_req_header_t;
+
+typedef struct {
+    ngx_str_t                   _method_name;
     ngx_http_c_func_app_handler _handler;
+    ngx_array_t                 *ext_req_headers;
     // ngx_msec_t proc_timeout;
 } ngx_http_c_func_loc_conf_t;
 
@@ -113,8 +119,10 @@ static void * ngx_http_c_func_create_srv_conf(ngx_conf_t *cf);
 static char * ngx_http_c_func_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
 static void * ngx_http_c_func_create_loc_conf(ngx_conf_t *cf);
 static char * ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
+static char *ngx_http_c_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_c_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_c_func_precontent_handler(ngx_http_request_t *r);
+static void ngx_http_c_func_parse_ext_request_headers(ngx_http_request_t *r, ngx_array_t *ext_req_headers);
 static ngx_int_t ngx_http_c_func_rewrite_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_c_func_process_init(ngx_cycle_t *cycle);
 static void ngx_http_c_func_process_exit(ngx_cycle_t *cycle);
@@ -228,6 +236,13 @@ static ngx_command_t ngx_http_c_func_commands[] = {
         ngx_conf_set_str_slot,
         NGX_HTTP_SRV_CONF_OFFSET,
         offsetof(ngx_http_c_func_srv_conf_t, _ca_cart),
+        NULL
+    },
+    {   ngx_string("ngx_http_c_func_add_req_header"),
+        NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_HTTP_LIF_CONF | NGX_CONF_TAKE2,
+        ngx_http_c_func_ext_req_headers_add_cmd,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        0,
         NULL
     },
     {   ngx_string("ngx_http_c_func_call"), /* directive */
@@ -425,6 +440,42 @@ ngx_http_c_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command_t 
 //     return NGX_CONF_OK;
 // } /* ngx_http_c_func_srv_post_conf_handler */
 
+static char *
+ngx_http_c_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+    ngx_http_c_func_loc_conf_t        *lcf = conf;
+    ngx_str_t                         *value;
+    ngx_http_c_func_req_header_t      *hdr;
+    ngx_http_compile_complex_value_t   ccv;
+
+    value = cf->args->elts;
+
+    if (lcf->ext_req_headers == NULL || lcf->ext_req_headers == NGX_CONF_UNSET_PTR) {
+        lcf->ext_req_headers = ngx_array_create(cf->pool, 2,
+                                                sizeof(ngx_http_c_func_req_header_t));
+        if (lcf->ext_req_headers == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    hdr = ngx_array_push(lcf->ext_req_headers);
+    if (hdr == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    hdr->key = value[1];
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = &value[2];
+    ccv.complex_value = &hdr->value;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+    return NGX_CONF_OK;
+}
+
 /**
  * Configuration setup function that installs the content handler.
  *
@@ -439,33 +490,11 @@ ngx_http_c_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command_t 
  */
 static char *
 ngx_http_c_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-    // ngx_str_t *value;
     ngx_http_c_func_srv_conf_t *scf;
     ngx_http_c_func_loc_conf_t *lcf = conf;
-    // ngx_str_t varname;
 
 
     scf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_c_func_module);
-
-    // value = cf->args->elts;
-
-    // if (cf->args->nelts == 3 &&
-    //         value[2].len > sizeof("respTo=") - 1 &&
-    //         ngx_strncmp(value[2].data, "respTo=", 6) == 0 ) {
-
-    //     lcf->_is_call_to_var = 1;
-
-    //     varname.data = value[2].data + sizeof("respTo=") - 1;
-    //     varname.len = value[2].len - (sizeof("respTo=") - 1);
-
-    //     ngx_http_variable_t  *var;
-    //     var = ngx_http_add_variable(cf, &varname, NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE | NGX_HTTP_VAR_NOHASH);
-    //     if (var == NULL) {
-    //         return NGX_CONF_ERROR;
-    //     }
-    //     var->get_handler = ngx_http_c_func_get_resp_var;
-    //     var->data = 0;
-    // }
 
     if (scf && scf->_libname.len > 0) {
         ngx_http_c_func_loc_q_t *loc_q = ngx_pcalloc(cf->pool, sizeof(ngx_http_c_func_loc_q_t));
@@ -883,8 +912,8 @@ ngx_http_c_func_create_loc_conf(ngx_conf_t *cf) {
     if (conf == NULL) {
         return NGX_CONF_ERROR;
     }
-    /***ngx_pcalloc has inited properly*/
-    // conf->_method_name.len = NGX_CONF_UNSET_SIZE;
+
+    conf->ext_req_headers = NGX_CONF_UNSET_PTR;
     return conf;
 }
 
@@ -892,9 +921,10 @@ ngx_http_c_func_create_loc_conf(ngx_conf_t *cf) {
 
 static char*
 ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
-    // ngx_http_c_func_loc_conf_t *prev = parent;
-    // ngx_http_c_func_loc_conf_t *conf = child;
+    ngx_http_c_func_loc_conf_t *prev = parent;
+    ngx_http_c_func_loc_conf_t *conf = child;
 
+    ngx_conf_merge_ptr_value(conf->ext_req_headers, prev->ext_req_headers, NULL);
     // ngx_conf_merge_str_value(conf->_method_name, prev->_method_name, "");
 
     // if (conf->_method_name.len == 0) {
@@ -1146,7 +1176,48 @@ single_thread:
 
 } /* ngx_http_c_func_precontent_handler */
 
+static void
+ngx_http_c_func_parse_ext_request_headers(ngx_http_request_t *r, ngx_array_t *ext_req_headers) {
+    ngx_uint_t i, nelts;
+    ngx_http_c_func_req_header_t *hdrs;
+    ngx_str_t hdr_val;
+    ngx_table_elt_t *h;
+    ngx_http_header_t *hh;
+    ngx_http_core_main_conf_t *cmcf;
 
+    hdrs = ext_req_headers->elts;
+    nelts = ext_req_headers->nelts;
+    cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
+
+    for (i = 0; i < nelts; i++) {
+        if (ngx_http_complex_value(r, &hdrs->value, &hdr_val) == NGX_OK) {
+
+            h = ngx_list_push(&r->headers_in.headers);
+            if (h == NULL) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "error when adding header %s", "insufficient memory allocate");
+                break;
+            }
+
+            h->key.len = hdrs->key.len;
+            h->key.data = hdrs->key.data;
+            h->hash = ngx_hash_key(h->key.data, h->key.len);
+
+            h->value.len = hdr_val.len;
+            h->value.data = hdr_val.data;
+
+            h->lowcase_key = h->key.data;
+
+            hh = ngx_hash_find(&cmcf->headers_in_hash, h->hash, h->lowcase_key, h->key.len);
+
+            if (hh && hh->handler(r, h, hh->offset) != NGX_OK) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "%s", "error when adding header");
+            }
+        } else {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "%s", "error when adding header");
+        }
+        hdrs++;
+    }
+}
 /**
  * Rewrite handler.
  * Ref:: https://github.com/calio/form-input-nginx-module
@@ -1160,6 +1231,10 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
     ngx_http_c_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_c_func_module);
     ngx_http_c_func_internal_ctx_t *ctx;
     ngx_int_t rc;
+
+    if (lcf->ext_req_headers) {
+        ngx_http_c_func_parse_ext_request_headers(r, lcf->ext_req_headers);
+    }
 
     if (lcf->_handler == NULL) {
         return NGX_DECLINED;

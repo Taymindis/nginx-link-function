@@ -134,13 +134,13 @@ static u_char* ngx_http_c_func_strdup_with_p(ngx_pool_t *pool, const char *src, 
 
 // static ngx_int_t ngx_http_c_func_get_resp_var(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 // static void ngx_http_c_func_set_resp_var_with_r(ngx_http_request_t *r, ngx_http_c_func_ctx_t *ctx, const char* resp_content, size_t resp_len);
-#if (nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
 static void ngx_http_c_func_output_filter(ngx_http_request_t *r);
 #else
 static ngx_int_t ngx_http_c_func_output_filter(ngx_http_request_t *r);
 #endif
 
-#if (NGX_THREADS && nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
 static void ngx_http_c_func_after_process(ngx_event_t *ev);
 static void ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log);
 #endif
@@ -549,13 +549,8 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
         *h = ngx_http_c_func_rewrite_handler;
 
         /***Enable pre content phase for apps concurrent processing request layer, NGX_DONE and wait for finalize request ***/
-#if (nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
         h = ngx_array_push(&cmcf->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
-        if (h == NULL) {
-            return NGX_ERROR;
-        }
-
-        *h = ngx_http_c_func_precontent_handler;
 #else
         /**Access Phase is the only last phase for multi thread, we need to mimic to trick nginx c function access phase at first to register,
             then it will be last to called as it is reverse order
@@ -571,10 +566,14 @@ ngx_http_c_func_post_configuration(ngx_conf_t *cf) {
         //     h[i + 1] = h[i];
         // }
 
-        // h[0] = ngx_http_c_func_precontent_handler;
-        *h = ngx_http_c_func_precontent_handler;
-
+        // h[0] = ngx_http_c_func_precontent_handler;   
 #endif
+        
+        if (h == NULL) {
+            return NGX_ERROR;
+        }
+
+        *h = ngx_http_c_func_precontent_handler;
 
     }
 
@@ -627,7 +626,7 @@ ngx_http_c_func_module_init(ngx_cycle_t *cycle) {
 
     cscfp = cmcf->servers.elts;
 
-#if (NGX_THREADS && nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, " enabled aio threads for c-function module ");
 #endif
 
@@ -941,7 +940,7 @@ ngx_http_c_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     return NGX_CONF_OK;
 }
 
-#if (NGX_THREADS && nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
 static void
 ngx_http_c_func_process_t_handler(void *data, ngx_log_t *log)
 {
@@ -1024,7 +1023,7 @@ ngx_http_c_func_precontent_handler(ngx_http_request_t *r) {
     if (internal_ctx->aio_processing) {
         return NGX_AGAIN;
     } else {
-#if (nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
         ngx_http_c_func_output_filter(r);
         return NGX_DONE;
 #else
@@ -1136,7 +1135,7 @@ REQUEST_BODY_DONE:
         new_ctx->req_body_len = 0;
     }
 
-#if (NGX_THREADS && nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
     internal_ctx->aio_processing = 1;
     ngx_thread_pool_t         *tp;
     ngx_http_core_loc_conf_t     *clcf;
@@ -1167,7 +1166,7 @@ single_thread:
     ngx_log_error(NGX_LOG_WARN, r->connection->log, 0, " nginx c function with nginx 1.13.3 and below is running single thread only, upgrade to nginx > 1.13.3 for concurrent request");
 #endif
     lcf->_handler(new_ctx);
-#if (nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
     ngx_http_c_func_output_filter(r);
     return NGX_DONE;
 #else
@@ -1755,7 +1754,7 @@ ngx_http_c_func_write_resp(
                                 );
 }
 
-#if (nginx_version > 1013003)
+#if (NGX_THREADS) && (nginx_version > 1013003)
 static void
 ngx_http_c_func_output_filter(
     ngx_http_request_t *r

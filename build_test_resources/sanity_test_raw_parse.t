@@ -124,7 +124,7 @@ qr/greeting=enjoy-http-c-function-testing$/
 
 === TEST 8: Set C_FUNC_TEST_CACHE
 --- config
-ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location = /testCFunGetCache {
     ngx_http_c_func_call "my_app_simple_get_cache";
 }
@@ -153,7 +153,7 @@ foo: foovalue
 
 === TEST 10: Authentication with nginx c function header
 --- config
-ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location /backend {
     return 200 "Welcome ${arg_userName}";
 }
@@ -177,7 +177,7 @@ qr/Welcome foo$/
 
 === TEST 11: Authentication with nginx c function header
 --- config
-ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location /backend {
     return 200 "Welcome ${arg_userName}";
 }
@@ -326,7 +326,7 @@ qr/greeting=enjoy-http-c-function-testing$/
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location = /testCFunGetCache {
     ngx_http_c_func_call "my_app_simple_get_cache";
 }
@@ -359,7 +359,7 @@ foo: foovalue
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location /backend {
     return 200 "Welcome ${arg_userName}";
 }
@@ -385,7 +385,7 @@ qr/Welcome foo$/
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_http_c_func_link_lib "/home/taymindis/github/nginx-c-function/t/libcfuntest.so";
+ngx_http_c_func_link_lib "NGINX_HTTP_C_FUNCTION_TEST_LIB_PATH/libcfuntest.so";
 location /backend {
     return 200 "Welcome ${arg_userName}";
 }

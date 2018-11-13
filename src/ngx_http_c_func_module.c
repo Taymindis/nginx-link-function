@@ -1237,7 +1237,7 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
         ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
 
         if (ctx != NULL) {
-            if (ctx->done) {
+            if (!ctx->waiting_more_body && ctx->done) {
                 /***Done Reading***/
                 return NGX_DECLINED;
             }
@@ -1270,13 +1270,9 @@ ngx_http_c_func_rewrite_handler(ngx_http_request_t *r) {
             return rc;
         }
 
-#if nginx_version >= 8011
-        r->main->count--;
-#endif
-
         if (rc == NGX_AGAIN) {
             ctx->waiting_more_body = 1;
-            return NGX_AGAIN;
+            return NGX_DONE;
         }
 
         return NGX_DECLINED;
@@ -1301,11 +1297,15 @@ ngx_http_c_func_client_body_handler(ngx_http_request_t *r) {
     ngx_http_c_func_internal_ctx_t *ctx;
     ctx = ngx_http_get_module_ctx(r, ngx_http_c_func_module);
 
+
+#if nginx_version >= 8011
+        r->main->count--;
+#endif
     /* waiting_more_body my rewrite phase handler */
     if (ctx->waiting_more_body) {
         ctx->done = 1;
         ctx->waiting_more_body = 0;
-        r->write_event_handler = ngx_http_core_run_phases;
+        // r->write_event_handler = ngx_http_core_run_phases;
         ngx_http_core_run_phases(r);
     }
 }

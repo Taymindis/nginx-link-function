@@ -133,13 +133,7 @@ static void ngx_http_link_func_client_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_srv_conf_t *scf, ngx_http_link_func_main_conf_t* mcf);
 static u_char* ngx_http_link_func_strdup_with_p(ngx_pool_t *pool, const char *src, size_t len);
 
-// static ngx_int_t ngx_http_link_func_get_resp_var(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
-// static void ngx_http_link_func_set_resp_var_with_r(ngx_http_request_t *r, ngx_link_func_ctx_t *ctx, const char* resp_content, size_t resp_len);
-// #if (NGX_THREADS) && (nginx_version > 1013003)
-// static void ngx_http_link_func_output_filter(ngx_http_request_t *r);
-// #else
 static ngx_int_t ngx_http_link_func_output_filter(ngx_http_request_t *r);
-// #endif
 
 #if (NGX_THREADS) && (nginx_version > 1013003)
 static void ngx_http_link_func_after_process(ngx_event_t *ev);
@@ -422,7 +416,6 @@ ngx_http_link_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command
 
     return NGX_CONF_OK;
 }
-
 
 // static char *ngx_http_link_func_srv_post_conf_handler(ngx_conf_t *cf, void *data, void *conf) {
 //     ngx_str_t *value = conf;
@@ -1009,12 +1002,7 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
     if (internal_ctx->aio_processing) {
         return NGX_AGAIN;
     } else {
-// #if (NGX_THREADS) && (nginx_version > 1013003)
-//         ngx_http_link_func_output_filter(r);
-//         return NGX_OK;
-// #else
         return NGX_DECLINED;
-// #endif
     }
 
 new_task:
@@ -1024,8 +1012,8 @@ new_task:
     new_ctx->__log__ = r->connection->log;
     new_ctx->shared_mem = (void*)mcf->shm_ctx->shared_mem;
 
-    /***Set to default incase link library does not return anything ***/
-    internal_ctx->rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
+    /***Set to NGX_HTTP_NOT_FOUND incase function handler or it has subrequest does not return anything ***/
+    internal_ctx->rc = NGX_HTTP_NOT_FOUND;
 
     if (r->args.len > 0) {
         new_ctx->req_args = ngx_pcalloc(r->pool, r->args.len + 1);
@@ -1613,14 +1601,6 @@ ngx_link_func_write_resp_l(
 
     ngx_http_request_t *r = (ngx_http_request_t*)appctx->__r__;
 
-    // if ( ((ngx_http_link_func_loc_conf_t*) ngx_http_get_module_loc_conf(r, ngx_http_link_func_module) )->_is_call_to_var ) {
-    //     ngx_log_error(NGX_LOG_WARN,
-    //                   r->connection->log,
-    //                   0, "Recommended to call ngx_http_link_func_set_resp_var. ngx_http_link_func_write_resp only applicable when no variable specified");
-    //     ngx_http_link_func_set_resp_var_with_r(r, appctx, resp_content, resp_content_len);
-    //     return;
-    // }
-
     internal_ctx = ngx_http_get_module_ctx(r, ngx_http_link_func_module);
 
     if (internal_ctx == NULL) {
@@ -1682,69 +1662,6 @@ ngx_link_func_write_resp(
                               );
 }
 
-// #if (NGX_THREADS) && (nginx_version > 1013003)
-// static void
-// ngx_http_link_func_output_filter(
-//     ngx_http_request_t *r
-// ) {
-//     ngx_int_t rc;
-//     ngx_chain_t out;
-//     ngx_http_link_func_internal_ctx_t *internal_ctx;
-//     ngx_str_t *resp_content_type, *resp_status_line;
-//     ngx_buf_t *b;
-
-//     internal_ctx = ngx_http_get_module_ctx(r, ngx_http_link_func_module);
-
-//     if (internal_ctx == NULL) {
-//         ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Session is not valid");
-//         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-//         return;
-//     }
-
-//     if (internal_ctx->rc == NGX_HTTP_INTERNAL_SERVER_ERROR) {
-//         ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Apps Internal Server error");
-//         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-//         return;
-//     }
-
-//     resp_status_line = &internal_ctx->status_line;
-//     resp_content_type = &internal_ctx->content_type;
-//     b = internal_ctx->resp_content;
-
-//     r->headers_out.status = internal_ctx->status_code;
-
-//     if (resp_status_line->len) {
-//         r->headers_out.status_line.len = resp_status_line->len;
-//         r->headers_out.status_line.data = resp_status_line->data;
-//     }
-
-//     /* Set the Content-Type header. */
-//     r->headers_out.content_type.len = resp_content_type->len;
-//     r->headers_out.content_type.data = resp_content_type->data;
-
-//     /* Get the content length of the body. */
-//     r->headers_out.content_length_n = ngx_buf_size(b);
-
-//     rc = ngx_http_send_header(r); /* Send the headers */
-//     if (rc == NGX_ERROR) {
-//         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "response processing failed.");
-//         // ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-//         rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-//         ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-//         return;
-
-//     }
-
-//     /* Insertion in the buffer chain. */
-//     out.buf = b;
-//     out.next = NULL; /* just one buffer */
-
-//     /* Send the body, and return the status code of the output filter chain. */
-//     // ngx_http_finalize_request(r, ngx_http_output_filter(r, &out)); // only using when request client body
-//     // rc = ngx_http_output_filter(r, &out);
-//     ngx_http_output_filter(r, &out);
-// }
-// #else
 static ngx_int_t
 ngx_http_link_func_output_filter(
     ngx_http_request_t *r
@@ -1762,9 +1679,9 @@ ngx_http_link_func_output_filter(
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    if (internal_ctx->rc == NGX_HTTP_INTERNAL_SERVER_ERROR) {
-        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Apps Internal Server error");
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    if (internal_ctx->rc == NGX_HTTP_NOT_FOUND) {
+        /** might not handle content phase, request routed to the next handler **/
+        return NGX_HTTP_NOT_FOUND;
     }
 
     resp_status_line = &internal_ctx->status_line;
@@ -1800,7 +1717,6 @@ ngx_http_link_func_output_filter(
     // ngx_http_finalize_request(r, ngx_http_output_filter(r, &out)); // only using when request client body
     return ngx_http_output_filter(r, &out);
 }
-// #endif
 
 /****Download Feature Support ****/
 static int

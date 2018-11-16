@@ -86,7 +86,7 @@ location = /testLinkFuncERRORRESP {
 }
 --- request
 GET /testLinkFuncERRORRESP?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==
---- error_code: 500
+--- error_code: 404
 --- response_headers
 Content-Type: text/html
 
@@ -282,7 +282,7 @@ location = /testLinkFuncERRORRESP {
 }
 --- request
 GET /testLinkFuncERRORRESP?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==
---- error_code: 500
+--- error_code: 404
 --- response_headers
 Content-Type: text/html
 

@@ -972,7 +972,7 @@ ngx_http_c_func_after_process(ngx_event_t *ev) {
     r->main->blocked--;
     r->aio = 0;
 
-    ngx_http_core_run_phases(r);
+    r->write_event_handler(r);
     ngx_http_run_posted_requests(c);
 }
 #endif
@@ -1301,11 +1301,11 @@ ngx_http_c_func_client_body_handler(ngx_http_request_t *r) {
 #if nginx_version >= 8011
         r->main->count--;
 #endif
+    r->write_event_handler = ngx_http_core_run_phases;
     /* waiting_more_body my rewrite phase handler */
     if (ctx->waiting_more_body) {
         ctx->done = 1;
         ctx->waiting_more_body = 0;
-        // r->write_event_handler = ngx_http_core_run_phases;
         ngx_http_core_run_phases(r);
     }
 }

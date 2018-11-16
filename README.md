@@ -1,5 +1,5 @@
-nginx-c-function
-================
+nginx-link-function
+===================
 
 
 Table of Contents
@@ -18,13 +18,13 @@ Table of Contents
 Introduction
 ============
 
-nginx-c-function is a nginx module which provides dynamic linking to your application in server context and call the function of your application in location directive.You could direct link your C/C++ application (or any other which accept dynamic linking) to nginx server.
+nginx-link-function is a nginx module which provides dynamic linking to your application in server context and call the function of your application in location directive.You could direct link your C/C++ application (or any other which accept dynamic linking) to nginx server.
 
 
 How it works
 ============
 
-![Image of nginx-c-function](nginx-c-function-architecture.png)
+![Image of nginx-link-function](nginx-link-function-architecture.png)
 
 
 Usage
@@ -35,11 +35,11 @@ Usage
 server {
   listen 8888;
   ...
-  ngx_http_c_func_link_lib "/path/to/your/libcfuntest.so";
+  ngx_link_func_lib "/path/to/your/libcfuntest.so";
   ...
   ...
   location = /testCFunGreeting {
-      ngx_http_c_func_call "my_app_simple_get_greeting"; 
+      ngx_link_func_call "my_app_simple_get_greeting"; 
   }
 }
 
@@ -47,11 +47,11 @@ server {
   listen 8989;
   aio threads;
   ...
-  ngx_http_c_func_link_lib "/path/to/your/libcfuntest.so"; # sharing data memory with server 1 if the path are same with server 1
+  ngx_link_func_lib "/path/to/your/libcfuntest.so"; # sharing data memory with server 1 if the path are same with server 1
   ...
   ...
   location = /testCFunGreeting {
-      ngx_http_c_func_call "my_app_simple_get_greeting" 
+      ngx_link_func_call "my_app_simple_get_greeting" 
   }
 }
 
@@ -59,7 +59,7 @@ server {
   listen 8999;
   aio threads;
   ...
-  ngx_http_c_func_link_lib "/path/to/your/libcfuntest2.so"; # another application
+  ngx_link_func_lib "/path/to/your/libcfuntest2.so"; # another application
   ...
   ...
   location = /testPost {
@@ -67,7 +67,7 @@ server {
       if ( $request_method !~ ^(POST)$ ) {
         return 405;
       }
-      ngx_http_c_func_call "my_2nd_app_simple_get_token";
+      ngx_link_func_call "my_2nd_app_simple_get_token";
   }
 }
 
@@ -75,8 +75,8 @@ server {
   listen 9888;
   aio threads;
   ...
-  ## Download application from cloud repo e.g. ngx_http_c_func_download_and_link_lib <download_link> <dest_link_file>
-  ngx_http_c_func_download_and_link_lib "http://abc.com/repos/libcfuntest.so" "/etc/nginx/libcfuntest3.so"
+  ## Download application from cloud repo e.g. ngx_link_func_download_link_lib <download_link> <dest_link_file>
+  ngx_link_func_download_link_lib "http://abc.com/repos/libcfuntest.so" "/etc/nginx/libcfuntest3.so"
   ...
   ...
   location = /testPost {
@@ -84,7 +84,7 @@ server {
       if ( $request_method !~ ^(POST)$ ) {
         return 405;
       }
-      ngx_http_c_func_call "my_3rd_app_simple_get_token";
+      ngx_link_func_call "my_3rd_app_simple_get_token";
   }
 }
 
@@ -92,8 +92,8 @@ server {
   listen 9898;
   aio threads;
   ...
-  ## Download application from cloud repo with extra header e.g. ngx_http_c_func_download_and_link_lib <download_link> <headers> <dest_link_file>
-  ngx_http_c_func_download_and_link_lib "https://abc.com/repos/libcfuntest.so" "Accept-Language:en_US\r\nAuthorization:Bearer KA.eyJ2ZXJzaadlasdlaldhjHJ2h3ldjklsjaklcjkljasdklcmasaskdaJxdkL3ftjM\r\n" "/etc/nginx/libcfuntest4.so"
+  ## Download application from cloud repo with extra header e.g. ngx_link_func_download_link_lib <download_link> <headers> <dest_link_file>
+  ngx_link_func_download_link_lib "https://abc.com/repos/libcfuntest.so" "Accept-Language:en_US\r\nAuthorization:Bearer KA.eyJ2ZXJzaadlasdlaldhjHJ2h3ldjklsjaklcjkljasdklcmasaskdaJxdkL3ftjM\r\n" "/etc/nginx/libcfuntest4.so"
   ...
   ...
   location = /testPost {
@@ -101,7 +101,7 @@ server {
       if ( $request_method !~ ^(POST)$ ) {
         return 405;
       }
-      ngx_http_c_func_call "my_other_app_simple_get_token";
+      ngx_link_func_call "my_other_app_simple_get_token";
   }
 }
 ```
@@ -115,19 +115,19 @@ wget 'http://nginx.org/download/nginx-1.10.3.tar.gz'
 tar -xzvf nginx-1.10.3.tar.gz
 cd nginx-1.10.3/
 
-./configure --add-module=/path/to/nginx-c-function
+./configure --add-module=/path/to/nginx-link-function
 
 make -j2
 sudo make install
 ```
 
-#### ngx_http_c_func_module.h header not found when configure
+#### ngx_link_func_module.h header not found when configure
 
 When first time configure this project, I purposely do not include this header, you may need to install it to your c header file as this header file need to share with your .so application as well.
 
 #### Example of installing header
 ```bash
-install -m 644 /path/to/nginx-c-function/src/ngx_http_c_func_module.h /usr/local/include/
+install -m 644 /path/to/nginx-link-function/src/ngx_link_func_module.h /usr/local/include/
 ```
 
 
@@ -137,15 +137,15 @@ install -m 644 /path/to/nginx-c-function/src/ngx_http_c_func_module.h /usr/local
 Interface that expose to client application
 ============================================
 
-This is the interface that you can use to get more details from nginx server, it all inside the ngx_http_c_func_module.h.
+This is the interface that you can use to get more details from nginx server, it all inside the ngx_link_func_module.h.
 
 ```c
 
-#define ngx_http_c_func_content_type_plaintext "text/plain"
-#define ngx_http_c_func_content_type_html "text/html; charset=utf-8"
-#define ngx_http_c_func_content_type_json "application/json"
-#define ngx_http_c_func_content_type_jsonp "application/javascript"
-#define ngx_http_c_func_content_type_xformencoded "application/x-www-form-urlencoded"
+#define ngx_link_func_content_type_plaintext "text/plain"
+#define ngx_link_func_content_type_html "text/html; charset=utf-8"
+#define ngx_link_func_content_type_json "application/json"
+#define ngx_link_func_content_type_jsonp "application/javascript"
+#define ngx_link_func_content_type_xformencoded "application/x-www-form-urlencoded"
 
 typedef struct {
   char *req_args; // Uri Args
@@ -157,19 +157,19 @@ typedef struct {
   void* __r__;
   void* __pl__;
   void* __log__;
-} ngx_http_c_func_ctx_t;
+} ngx_link_func_ctx_t;
 
-extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
-extern void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg);
-extern void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg);
-extern void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg);
-extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key);
-extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
-extern void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
-extern void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+extern void ngx_link_func_log_debug(ngx_link_func_ctx_t *ctx, const char* msg);
+extern void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);
+extern void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
+extern void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
+extern u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key);
+extern void* ngx_link_func_get_query_param(ngx_link_func_ctx_t *ctx, const char *key);
+extern void* ngx_link_func_palloc(ngx_link_func_ctx_t *ctx, size_t size);
+extern void* ngx_link_func_pcalloc(ngx_link_func_ctx_t *ctx, size_t size);
 
-extern void ngx_http_c_func_write_resp(
-    ngx_http_c_func_ctx_t *ctx,
+extern void ngx_link_func_write_resp(
+    ngx_link_func_ctx_t *ctx,
     uintptr_t status_code,
     const char* status_line,
     const char* content_type,
@@ -179,14 +179,14 @@ extern void ngx_http_c_func_write_resp(
 
 
 // Shared Memory and Cache Scope
-extern void ngx_http_c_func_shmtx_lock(void *shared_mem);
-extern void ngx_http_c_func_shmtx_unlock(void *shared_mem);
-extern void* ngx_http_c_func_shm_alloc(void *shared_mem, size_t size);
-extern void ngx_http_c_func_shm_free(void *shared_mem, void *ptr);
-extern void* ngx_http_c_func_cache_get(void *shared_mem, const char* key);
-extern void* ngx_http_c_func_cache_put(void *shared_mem, const char* key, void* value);
-extern void* ngx_http_c_func_cache_new(void *shared_mem, const char* key, size_t size);
-extern void ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
+extern void ngx_link_func_shmtx_lock(void *shared_mem);
+extern void ngx_link_func_shmtx_unlock(void *shared_mem);
+extern void* ngx_link_func_shm_alloc(void *shared_mem, size_t size);
+extern void ngx_link_func_shm_free(void *shared_mem, void *ptr);
+extern void* ngx_link_func_cache_get(void *shared_mem, const char* key);
+extern void* ngx_link_func_cache_put(void *shared_mem, const char* key, void* value);
+extern void* ngx_link_func_cache_new(void *shared_mem, const char* key, size_t size);
+extern void ngx_link_func_cache_remove(void *shared_mem, const char* key);
 
 ```
 
@@ -194,13 +194,13 @@ extern void ngx_http_c_func_cache_remove(void *shared_mem, const char* key);
 
 #### malloc/calloc from nginx pool
 ```c
-void* ngx_http_c_func_palloc(ngx_http_c_func_ctx_t *ctx, size_t size);
-void* ngx_http_c_func_pcalloc(ngx_http_c_func_ctx_t *ctx, size_t size);
+void* ngx_link_func_palloc(ngx_link_func_ctx_t *ctx, size_t size);
+void* ngx_link_func_pcalloc(ngx_link_func_ctx_t *ctx, size_t size);
 ```
 
 #### get the request header parameter from 
 ```c
-extern u_char* ngx_http_c_func_get_header(ngx_http_c_func_ctx_t *ctx, const char*key);
+extern u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key);
 ```
 
 #### get the uri args
@@ -210,7 +210,7 @@ ctx->req_args;
 
 #### get the query parameter
 ```c
-extern void* ngx_http_c_func_get_query_param(ngx_http_c_func_ctx_t *ctx, const char *key);
+extern void* ngx_link_func_get_query_param(ngx_link_func_ctx_t *ctx, const char *key);
 ```
 
 #### get the request body
@@ -225,16 +225,16 @@ ctx->req_body_len;
 
 #### loggin to nginx server
 ```c
-extern void ngx_http_c_func_log_debug(ngx_http_c_func_ctx_t *ctx, const char* msg);
-extern void ngx_http_c_func_log_info(ngx_http_c_func_ctx_t *ctx, const char* msg);
-extern void ngx_http_c_func_log_warn(ngx_http_c_func_ctx_t *ctx, const char* msg);
-extern void ngx_http_c_func_log_err(ngx_http_c_func_ctx_t *ctx, const char* msg);
+extern void ngx_link_func_log_debug(ngx_link_func_ctx_t *ctx, const char* msg);
+extern void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);
+extern void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
+extern void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
 ```
 
 #### Response out
 ```c
-extern void ngx_http_c_func_write_resp(
-    ngx_http_c_func_ctx_t *ctx,
+extern void ngx_link_func_write_resp(
+    ngx_link_func_ctx_t *ctx,
     uintptr_t status_code, // Status code
     const char* status_line, // Status line
     const char* content_type, // Response content type
@@ -251,7 +251,7 @@ Feel free to clone a sample project on [Sample Project](https://github.com/Taymi
 
 ```c
 #include <stdio.h>
-#include <ngx_http_c_func_module.h>
+#include <ngx_link_func_module.h>
 
 /*** build the program as .so library and copy to the preferred place for nginx to link this library ***/
 /*** gcc -shared -o libcfuntest.so -fPIC cfuntest.c ***/
@@ -259,8 +259,8 @@ Feel free to clone a sample project on [Sample Project](https://github.com/Taymi
 
 int is_service_on = 0;
 
-void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx) {
-    ngx_http_c_func_log(info, ctx, "%s", "Starting The Application");
+void ngx_link_func_init(ngx_link_func_ctx_t* ctx) {
+    ngx_link_func_log(info, ctx, "%s", "Starting The Application");
 
 
     is_service_on=1;
@@ -268,22 +268,22 @@ void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx) {
 
 
 
-void my_app_simple_get_greeting(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get");
+void my_app_simple_get_greeting(ngx_link_func_ctx_t *ctx) {
+    ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get");
 
-    ngx_http_c_func_write_resp(
+    ngx_link_func_write_resp(
         ctx,
         200,
         "200 OK",
         "text/plain",
-        "greeting from ngx_http_c_func testing"
+        "greeting from ngx_link_func testing"
     );
 }
 
-void my_app_simple_get_args(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get_args");
+void my_app_simple_get_args(ngx_link_func_ctx_t *ctx) {
+    ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get_args");
 
-    ngx_http_c_func_write_resp(
+    ngx_link_func_write_resp(
         ctx,
         200,
         "200 OK",
@@ -292,12 +292,12 @@ void my_app_simple_get_args(ngx_http_c_func_ctx_t *ctx) {
     );
 }
 
-void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get_token_args");
+void my_app_simple_get_token_args(ngx_link_func_ctx_t *ctx) {
+    ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get_token_args");
 
-    char * tokenArgs = ngx_http_c_func_get_query_param(ctx, "token");
+    char * tokenArgs = ngx_link_func_get_query_param(ctx, "token");
     if (! tokenArgs) {
-        ngx_http_c_func_write_resp(
+        ngx_link_func_write_resp(
             ctx,
             401,
             "401 unauthorized",
@@ -305,7 +305,7 @@ void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
             "Token Not Found"
         );
     } else {
-        ngx_http_c_func_write_resp(
+        ngx_link_func_write_resp(
             ctx,
             401,
             "401 unauthorized",
@@ -315,10 +315,10 @@ void my_app_simple_get_token_args(ngx_http_c_func_ctx_t *ctx) {
     }
 }
 
-void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_post");
+void my_app_simple_post(ngx_link_func_ctx_t *ctx) {
+    ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_post");
 
-    ngx_http_c_func_write_resp(
+    ngx_link_func_write_resp(
         ctx,
         202,
         "202 Accepted and Processing",
@@ -330,48 +330,48 @@ void my_app_simple_post(ngx_http_c_func_ctx_t *ctx) {
 
 
 
-void my_app_simple_get_no_resp(ngx_http_c_func_ctx_t *ctx) {
-    ngx_http_c_func_log_info(ctx, "Calling back and log from my_app_simple_get_no_resp");
+void my_app_simple_get_no_resp(ngx_link_func_ctx_t *ctx) {
+    ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get_no_resp");
 
 
 }
 
-void ngx_http_c_func_exit(ngx_http_c_func_ctx_t* ctx) {
-    ngx_http_c_func_log(info, ctx, "%s\n", "Shutting down The Application");
+void ngx_link_func_exit(ngx_link_func_ctx_t* ctx) {
+    ngx_link_func_log(info, ctx, "%s\n", "Shutting down The Application");
 
     is_service_on = 0;
 }
 ```
 
 #### Noted: 
-The c-func init and exit are reserved function when started the nginx, it will call init method, when stop nginx, it will call exit function.
+The function init and exit are reserved function when started the nginx, it will call init method, when stop nginx, it will call exit function.
 ```c
-void ngx_http_c_func_init(ngx_http_c_func_ctx_t* ctx){}
-void ngx_http_c_func_exit(ngx_http_c_func_ctx_t* ctx){}
+void ngx_link_func_init(ngx_link_func_ctx_t* ctx){}
+void ngx_link_func_exit(ngx_link_func_ctx_t* ctx){}
 ```
 
 #### Log Level
 The log can be called, the logged message will be store where you config error log in nginx.conf
 ```c
-ngx_http_c_func_log_info(ctx, "This is info direct message");
-ngx_http_c_func_log(info, ctx, "%s", "This is info with formatted message");
-ngx_http_c_func_log_debug(ctx, "This is debug direct message");
-ngx_http_c_func_log(debug, ctx, "%s", "This is debug with formatted message");
+ngx_link_func_log_info(ctx, "This is info direct message");
+ngx_link_func_log(info, ctx, "%s", "This is info with formatted message");
+ngx_link_func_log_debug(ctx, "This is debug direct message");
+ngx_link_func_log(debug, ctx, "%s", "This is debug with formatted message");
 
-ngx_http_c_func_log_info(ctx, "%s", "This is info with formatted message"); // Wrong format
-ngx_http_c_func_log_debug(ctx, "%s", "This is info with formatted message"); // Wrong format
+ngx_link_func_log_info(ctx, "%s", "This is info with formatted message"); // Wrong format
+ngx_link_func_log_debug(ctx, "%s", "This is info with formatted message"); // Wrong format
 ```
 
 ### provide ca-cert to download your app(.so)?? please embedded this in your nginx.conf's server context.
 ```c
-ngx_http_c_func_ca_cert "/etc/ssl/certs/ca-cert.crt"
-ngx_http_c_func_download_and_link_lib "https://abc.com/repos/libcfuntest.so" "/etc/nginx/libcfuntest4.so"
+ngx_link_func_ca_cert "/etc/ssl/certs/ca-cert.crt"
+ngx_link_func_download_link_lib "https://abc.com/repos/libcfuntest.so" "/etc/nginx/libcfuntest4.so"
 ```
 
 ### provide ca-cert and extra header to download your app(.so)?? please embedded this in your nginx.conf's server context.
 ```c
-ngx_http_c_func_ca_cert "/etc/ssl/certs/ca-cert.crt"
-ngx_http_c_func_download_and_link_lib "https://abc.com/repos/libcfuntest.so" "Accept-Language:en_US\r\nAuthorization:Bearer KA.eyJ2ZXJzaadlasdlaldhjHJ2h3ldjklsjaklcjkljasdklcmasaskdaJxdkL3ftjM\r\n" "/etc/nginx/libcfuntest4.so"
+ngx_link_func_ca_cert "/etc/ssl/certs/ca-cert.crt"
+ngx_link_func_download_link_lib "https://abc.com/repos/libcfuntest.so" "Accept-Language:en_US\r\nAuthorization:Bearer KA.eyJ2ZXJzaadlasdlaldhjHJ2h3ldjklsjaklcjkljasdklcmasaskdaJxdkL3ftjM\r\n" "/etc/nginx/libcfuntest4.so"
 
 ```
 
@@ -382,7 +382,7 @@ It depends on nginx test suite libs, please refer [test-nginx](https://github.co
 
 
 ```bash
-cd /path/to/nginx-c-function
+cd /path/to/nginx-link-function
 export PATH=/path/to/nginx-dirname:$PATH 
 sudo prove -r t/
 ```
@@ -392,14 +392,14 @@ sudo prove -r t/
 Support
 =======
 
-Please raise an [issue](https://github.com/Taymindis/nginx-c-function/issues) and I will fixed it as soon as I can
+Please raise an [issue](https://github.com/Taymindis/nginx-link-function/issues) and I will fixed it as soon as I can
 
 Alternatively, you may email to minikawoon2017@gmail.com
 
 Wiki
 ====
 
-Check out [wiki](https://github.com/Taymindis/nginx-c-function/wiki) for more details
+Check out [wiki](https://github.com/Taymindis/nginx-link-function/wiki) for more details
 
 
 [Back to TOC](#table-of-contents)

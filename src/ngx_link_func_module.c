@@ -963,7 +963,9 @@ ngx_http_link_func_after_process(ngx_event_t *ev) {
     r->main->blocked--;
     r->aio = 0;
 
-    r->write_event_handler(r);
+    // Force to run core run phase to avoid write handler is empty handler
+    // r->write_event_handler(r);
+    ngx_http_core_run_phases(r);
     ngx_http_run_posted_requests(c);
 }
 #endif
@@ -1681,7 +1683,7 @@ ngx_http_link_func_output_filter(
 
     if (internal_ctx->rc == NGX_HTTP_NOT_FOUND) {
         /** might not handle content phase, request routed to the next handler **/
-        return NGX_HTTP_NOT_FOUND;
+        return NGX_DECLINED;
     }
 
     resp_status_line = &internal_ctx->status_line;

@@ -1149,6 +1149,12 @@ single_thread:
 
 static ngx_int_t
 ngx_http_link_func_content_handler(ngx_http_request_t *r) {
+    ngx_http_link_func_loc_conf_t *lcf = ngx_http_get_module_loc_conf(r, ngx_http_link_func_module);
+
+    if (lcf->_handler == NULL) {
+        return NGX_DECLINED;
+    }
+    
     return ngx_http_link_func_output_filter(r);
 } /* ngx_http_link_func_content_handler */
 

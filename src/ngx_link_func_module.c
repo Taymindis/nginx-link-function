@@ -499,7 +499,6 @@ ngx_http_link_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     return ngx_conf_set_str_slot(cf, cmd, conf);
 } /* ngx_http_link_func_init_method */
 
-
 static ngx_int_t
 ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_srv_conf_t *scf, ngx_http_link_func_main_conf_t* mcf) {
     /**** Init the client apps ngx_http_link_func_init ***/
@@ -520,7 +519,6 @@ ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_sr
 
     ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "%s", "Done proceed init calls");
     return NGX_OK;
-
 }
 
 static ngx_int_t
@@ -541,7 +539,7 @@ ngx_http_link_func_post_configuration(ngx_conf_t *cf) {
         *h = ngx_http_link_func_rewrite_handler;
 
         /***Enable pre content phase for apps concurrent processing request layer, NGX_DONE and wait for finalize request ***/
-#if (NGX_THREADS) && (nginx_version > 1013003)
+#if (nginx_version > 1013003)
         h = ngx_array_push(&cmcf->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
         if (h == NULL) {
             return NGX_ERROR;
@@ -1140,7 +1138,7 @@ single_thread:
     ngx_log_error(NGX_LOG_WARN, r->connection->log, 0, " nginx link function with nginx 1.13.3 and below is running single thread only, upgrade to nginx > 1.13.3 for concurrent request");
 #endif
     lcf->_handler(new_ctx);
-#if (NGX_THREADS) && (nginx_version > 1013003)
+#if (nginx_version > 1013003)
     // ngx_http_link_func_output_filter(r);
     return NGX_DECLINED;
 #else

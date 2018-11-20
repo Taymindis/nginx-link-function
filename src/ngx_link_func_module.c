@@ -44,6 +44,18 @@
 * Configs
 *
 */
+#if (nginx_version > 1013003)
+
+#define NGX_SUBREQ_SEQUENTIAL  0
+#define NGX_SUBREQ_PARALLEL    1
+
+static ngx_conf_enum_t ngx_http_link_func_subrequest_flags[] = {
+    { ngx_string("sequential"), NGX_SUBREQ_SEQUENTIAL }, // subrequest run synchronizely but waiting for response
+    { ngx_string("parallel"), NGX_SUBREQ_PARALLEL }, // subrequest run parallely but waiting for response
+    { ngx_null_string, 0 }
+};
+#endif
+
 typedef struct {
     ngx_str_node_t sn;
     void       *value;
@@ -83,10 +95,22 @@ typedef struct {
     ngx_http_complex_value_t   value;
 } ngx_http_link_func_req_header_t;
 
+#if (nginx_version > 1013003)
 typedef struct {
-    ngx_str_t                   _method_name;
+    ngx_str_t           uri;
+    ngx_uint_t          flag;
+    ngx_flag_t          incl_args;
+    ngx_flag_t          incl_body;
+} ngx_http_link_func_subreq_conf_t;
+#endif
+
+typedef struct {
+    ngx_str_t                      _method_name;
     ngx_http_link_func_app_handler _handler;
-    ngx_array_t                 *ext_req_headers;
+    ngx_array_t                    *ext_req_headers;
+#if (nginx_version > 1013003)
+    ngx_array_t                    *subrequests;
+#endif
     // ngx_msec_t proc_timeout;
 } ngx_http_link_func_loc_conf_t;
 
@@ -101,6 +125,11 @@ typedef struct {
     ngx_str_t content_type;
     ngx_buf_t *resp_content;
     ngx_int_t rc;
+#if (nginx_version > 1013003)
+    ngx_uint_t        subreq_curr_index;
+    ngx_uint_t        subreq_parallel_wait_cnt;
+    ngx_uint_t        subreq_sequential_wait_cnt;
+#endif
 } ngx_http_link_func_internal_ctx_t;
 
 typedef struct {
@@ -121,6 +150,12 @@ static void * ngx_http_link_func_create_loc_conf(ngx_conf_t *cf);
 static char * ngx_http_link_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
 static char *ngx_http_link_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_link_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+#if (nginx_version > 1013003)
+static char *ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static ngx_int_t ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
+static ngx_int_t ngx_http_link_func_subreqest_sequential_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
+static ngx_int_t ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_subreq_conf_t *subreq, ngx_http_link_func_internal_ctx_t *ctx);
+#endif
 static ngx_int_t ngx_http_link_func_content_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_link_func_precontent_handler(ngx_http_request_t *r);
 static void ngx_http_link_func_parse_ext_request_headers(ngx_http_request_t *r, ngx_array_t *ext_req_headers);
@@ -132,8 +167,6 @@ static void ngx_http_link_func_master_exit(ngx_cycle_t *cycle);
 static void ngx_http_link_func_client_body_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_srv_conf_t *scf, ngx_http_link_func_main_conf_t* mcf);
 static u_char* ngx_http_link_func_strdup_with_p(ngx_pool_t *pool, const char *src, size_t len);
-
-static ngx_int_t ngx_http_link_func_output_filter(ngx_http_request_t *r);
 
 #if (NGX_THREADS) && (nginx_version > 1013003)
 static void ngx_http_link_func_after_process(ngx_event_t *ev);
@@ -240,6 +273,15 @@ static ngx_command_t ngx_http_link_func_commands[] = {
         0,
         NULL
     },
+#if (nginx_version > 1013003)
+    {   ngx_string("ngx_link_func_subrequest"), /* directive */
+        NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_1MORE, /* location context and takes up to 4 arguments*/
+        ngx_http_link_func_subrequest_cmd, /* configuration setup function */
+        NGX_HTTP_LOC_CONF_OFFSET, /* No offset. Only one context is supported. */
+        0, /* No offset when storing the module configuration on struct. */
+        NULL
+    },
+#endif
     {   ngx_string("ngx_link_func_call"), /* directive */
         NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1, /* location context and takes 1 or 2 arguments*/
         ngx_http_link_func_init_method, /* configuration setup function */
@@ -469,6 +511,61 @@ ngx_http_link_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_command_t *cmd, v
     }
     return NGX_CONF_OK;
 }
+
+#if (nginx_version > 1013003)
+
+static char *
+ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+    ngx_http_link_func_loc_conf_t        *lcf = conf;
+    ngx_str_t                            *values;
+    ngx_http_link_func_subreq_conf_t     *subreq;
+    ngx_uint_t                           i, j;
+    ngx_conf_enum_t                      *e;
+
+    values = cf->args->elts;
+
+    if (lcf->subrequests == NULL || lcf->subrequests == NGX_CONF_UNSET_PTR) {
+        lcf->subrequests = ngx_array_create(cf->pool, 2, sizeof(ngx_http_link_func_subreq_conf_t));
+        if (lcf->subrequests == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    subreq = ngx_array_push(lcf->subrequests);
+    if (subreq == NULL) {
+        return NGX_CONF_ERROR;
+    }
+    ngx_memzero(subreq, sizeof(ngx_http_link_func_subreq_conf_t));
+
+    for (i = 1; i < cf->args->nelts; i++) {
+        if (i == 1) {
+            subreq->uri = values[i];
+        } else if (i == 2) {
+            e = ngx_http_link_func_subrequest_flags;
+            for (j = 0; e[j].name.len != 0; j++) {
+                if (e[j].name.len == values[i].len
+                        && ngx_strcasecmp(e[j].name.data, values[i].data) == 0) {
+                    subreq->flag = e[j].value;
+                    break;
+                }
+            }
+
+            if (e[j].name.len == 0) {
+                return "invalid subrequest flag given, either parallel or sequential.";
+            }
+        } else if (i == 3) {
+            if ( (sizeof("on") - 1) == values[i].len && ngx_strcasecmp((u_char*)"on", values[i].data) == 0) {
+                subreq->incl_args = 1;
+            }
+        } else if (i == 4) {
+            if ( (sizeof("on") - 1) == values[i].len && ngx_strcasecmp((u_char*)"on", values[i].data) == 0) {
+                subreq->incl_body = 1;
+            }
+        }
+    }
+    return NGX_CONF_OK;
+}
+#endif
 
 /**
  * Configuration setup function that installs the content handler.
@@ -900,6 +997,9 @@ ngx_http_link_func_create_loc_conf(ngx_conf_t *cf) {
     }
 
     conf->ext_req_headers = NGX_CONF_UNSET_PTR;
+#if (nginx_version > 1013003)
+    conf->subrequests = NGX_CONF_UNSET_PTR;
+#endif
     return conf;
 }
 
@@ -911,6 +1011,9 @@ ngx_http_link_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     ngx_http_link_func_loc_conf_t *conf = child;
 
     ngx_conf_merge_ptr_value(conf->ext_req_headers, prev->ext_req_headers, NULL);
+#if (nginx_version > 1013003)
+    ngx_conf_merge_ptr_value(conf->subrequests, prev->subrequests, NULL);
+#endif
     // ngx_conf_merge_str_value(conf->_method_name, prev->_method_name, "");
 
     // if (conf->_method_name.len == 0) {
@@ -968,6 +1071,86 @@ ngx_http_link_func_after_process(ngx_event_t *ev) {
 }
 #endif
 
+#if (nginx_version > 1013003)
+static ngx_int_t
+ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
+    ngx_http_link_func_internal_ctx_t   *ctx = data;
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "subrequest parallel done:%ui", r->headers_out.status);
+    ctx->subreq_parallel_wait_cnt--;
+    return rc;
+}
+static ngx_int_t
+ngx_http_link_func_subreqest_sequential_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
+    ngx_http_link_func_internal_ctx_t   *ctx = data;
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "subrequest sequential done:%ui", r->headers_out.status);
+    ctx->subreq_sequential_wait_cnt--;
+    return rc;
+}
+
+static ngx_int_t
+ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_subreq_conf_t *subreq, ngx_http_link_func_internal_ctx_t *ctx) {
+    ngx_http_request_t            *sr;
+    ngx_http_post_subrequest_t    *ps;
+    ngx_str_t                     *args;
+    // ngx_uint_t                    subreq_flag;
+
+    if (subreq->uri.len == 0) {
+        return NGX_ERROR;
+    }
+
+    if (subreq->incl_args) {
+        args = &r->args;
+    } else {
+        args = NULL;
+    }
+
+    ps = ngx_palloc(r->pool, sizeof(ngx_http_post_subrequest_t));
+    if (ps == NULL) {
+        return NGX_ERROR;
+    }
+    ps->data = ctx;
+
+    switch (subreq->flag) {
+    case NGX_SUBREQ_PARALLEL:
+        ps->handler = ngx_http_link_func_subreqest_parallel_done;
+        break;
+    default:
+        ps->handler = ngx_http_link_func_subreqest_sequential_done;
+        // ps = NULL;
+        break;
+    }
+
+
+    if (ngx_http_subrequest(r, &subreq->uri, args, &sr, ps, NGX_HTTP_SUBREQUEST_WAITED) == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    /*
+     * assign request body to avoid re read
+     */
+    if (subreq->incl_body) {
+        sr->request_body = r->request_body;
+        r->preserve_body = 1;
+
+        // header_only is already 0 when pcalloc
+        // sr->header_only = 0;
+    } else {
+        sr->request_body = ngx_pcalloc(r->pool, sizeof(ngx_http_request_body_t));
+        if (sr->request_body == NULL) {
+            return NGX_ERROR;
+        }
+        sr->header_only = 1;
+    }
+
+    sr->method = r->method;
+    sr->method_name = r->method_name;
+    // ctx->subrequest = sr;
+    return NGX_OK;
+}
+#endif
+
 /**
  * Pre Content handler.
  * @param r
@@ -981,11 +1164,20 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
     ngx_http_link_func_loc_conf_t      *lcf = ngx_http_get_module_loc_conf(r, ngx_http_link_func_module);
     ngx_http_link_func_main_conf_t     *mcf = ngx_http_get_module_main_conf(r, ngx_http_link_func_module);
     ngx_http_link_func_internal_ctx_t  *internal_ctx;
-    ngx_link_func_ctx_t           *new_ctx;
+    ngx_link_func_ctx_t                *new_ctx;
 
+#if (nginx_version > 1013003)
+    ngx_uint_t                       i, n_sub_reqs;
+    ngx_http_link_func_subreq_conf_t *subreqs, *subreq;
+
+    if (lcf->_handler == NULL && lcf->subrequests == NULL) {
+        return NGX_DECLINED;
+    }
+#else
     if (lcf->_handler == NULL) {
         return NGX_DECLINED;
     }
+#endif
 
     internal_ctx = ngx_http_get_module_ctx(r, ngx_http_link_func_module);
 
@@ -994,10 +1186,48 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
+#if (nginx_version > 1013003)
+    if ( lcf->subrequests ) {
+
+        if (internal_ctx->subreq_sequential_wait_cnt) {
+            return NGX_DONE;
+        }
+
+        n_sub_reqs = lcf->subrequests->nelts;
+        subreqs = lcf->subrequests->elts;
+
+        for (i = internal_ctx->subreq_curr_index; i < n_sub_reqs; i++) {
+            subreq = subreqs + i;
+            if (ngx_http_link_func_process_subrequest(r, subreq, internal_ctx) != NGX_OK ) {
+                return NGX_ERROR;
+            }
+
+            switch (subreq->flag) {
+            case NGX_SUBREQ_PARALLEL:
+                internal_ctx->subreq_curr_index = i + 1;
+                internal_ctx->subreq_parallel_wait_cnt++;
+                continue;
+            case NGX_SUBREQ_SEQUENTIAL:
+            default:
+                internal_ctx->subreq_curr_index = i + 1;
+                internal_ctx->subreq_sequential_wait_cnt++;
+                return NGX_DONE;
+            }
+        }
+
+        if (internal_ctx->subreq_parallel_wait_cnt) {
+            return NGX_DONE;
+        }
+    }
+
+    if (lcf->_handler == NULL) {
+        // ngx_http_finalize_request(r, NGX_DONE);
+        return NGX_DECLINED;
+    }
+
     if (internal_ctx->rc == NGX_CONF_UNSET) {
         goto new_task;
     }
-
 
     if (internal_ctx->aio_processing) {
         return NGX_AGAIN;
@@ -1005,7 +1235,9 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
         return NGX_DECLINED;
     }
 
+
 new_task:
+#endif
     new_ctx = ngx_pcalloc(r->pool, sizeof(ngx_link_func_ctx_t));
     new_ctx->__r__ = r;
     new_ctx->__pl__ = r->pool;
@@ -1139,7 +1371,6 @@ single_thread:
 #endif
     lcf->_handler(new_ctx);
 #if (nginx_version > 1013003)
-    // ngx_http_link_func_output_filter(r);
     return NGX_DECLINED;
 #else
     return ngx_http_link_func_content_handler(r);
@@ -1149,13 +1380,62 @@ single_thread:
 
 static ngx_int_t
 ngx_http_link_func_content_handler(ngx_http_request_t *r) {
+    ngx_int_t rc;
+    ngx_chain_t out;
+    ngx_http_link_func_internal_ctx_t *internal_ctx;
+    ngx_str_t *resp_content_type, *resp_status_line;
+    ngx_buf_t *b;
     ngx_http_link_func_loc_conf_t *lcf = ngx_http_get_module_loc_conf(r, ngx_http_link_func_module);
 
     if (lcf->_handler == NULL) {
         return NGX_DECLINED;
     }
-    
-    return ngx_http_link_func_output_filter(r);
+
+    internal_ctx = ngx_http_get_module_ctx(r, ngx_http_link_func_module);
+
+    if (internal_ctx == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Session is not valid");
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    if (internal_ctx->rc == NGX_HTTP_NOT_FOUND) {
+        /** might not handle content phase, request routed to the next handler **/
+        return NGX_DECLINED;
+    }
+
+    resp_status_line = &internal_ctx->status_line;
+    resp_content_type = &internal_ctx->content_type;
+    b = internal_ctx->resp_content;
+
+    r->headers_out.status = internal_ctx->status_code;
+
+    if (resp_status_line->len) {
+        r->headers_out.status_line.len = resp_status_line->len;
+        r->headers_out.status_line.data = resp_status_line->data;
+    }
+
+    /* Set the Content-Type header. */
+    r->headers_out.content_type.len = resp_content_type->len;
+    r->headers_out.content_type.data = resp_content_type->data;
+
+    /* Get the content length of the body. */
+    r->headers_out.content_length_n = ngx_buf_size(b);
+
+    /* Send the headers */
+    if ( ngx_http_send_header(r) == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "response processing failed.");
+        // ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* Insertion in the buffer chain. */
+    out.buf = b;
+    out.next = NULL; /* just one buffer */
+
+    /* Send the body, and return the status code of the output filter chain. */
+    rc = ngx_http_output_filter(r, &out);
+    // ngx_http_finalize_request(r, rc); // finalize will close the connection, last phase
+    return rc;
 } /* ngx_http_link_func_content_handler */
 
 static void
@@ -1218,9 +1498,15 @@ ngx_http_link_func_rewrite_handler(ngx_http_request_t *r) {
         ngx_http_link_func_parse_ext_request_headers(r, lcf->ext_req_headers);
     }
 
+#if (nginx_version > 1013003)
+    if (lcf->_handler == NULL && lcf->subrequests == NULL) {
+        return NGX_DECLINED;
+    }
+#else
     if (lcf->_handler == NULL) {
         return NGX_DECLINED;
     }
+#endif
 
     if (r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH)) {
         // r->request_body_in_single_buf = 1;
@@ -1244,7 +1530,6 @@ ngx_http_link_func_rewrite_handler(ngx_http_request_t *r) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
         ctx->rc = NGX_CONF_UNSET;
-
         ngx_http_set_ctx(r, ctx, ngx_http_link_func_module);
 
         /****Reading Body Request ****/
@@ -1666,62 +1951,6 @@ ngx_link_func_write_resp(
                                resp_content,
                                resp_len
                               );
-}
-
-static ngx_int_t
-ngx_http_link_func_output_filter(
-    ngx_http_request_t *r
-) {
-    // ngx_int_t rc;
-    ngx_chain_t out;
-    ngx_http_link_func_internal_ctx_t *internal_ctx;
-    ngx_str_t *resp_content_type, *resp_status_line;
-    ngx_buf_t *b;
-
-    internal_ctx = ngx_http_get_module_ctx(r, ngx_http_link_func_module);
-
-    if (internal_ctx == NULL) {
-        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Session is not valid");
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    if (internal_ctx->rc == NGX_HTTP_NOT_FOUND) {
-        /** might not handle content phase, request routed to the next handler **/
-        return NGX_DECLINED;
-    }
-
-    resp_status_line = &internal_ctx->status_line;
-    resp_content_type = &internal_ctx->content_type;
-    b = internal_ctx->resp_content;
-
-    r->headers_out.status = internal_ctx->status_code;
-
-    if (resp_status_line->len) {
-        r->headers_out.status_line.len = resp_status_line->len;
-        r->headers_out.status_line.data = resp_status_line->data;
-    }
-
-    /* Set the Content-Type header. */
-    r->headers_out.content_type.len = resp_content_type->len;
-    r->headers_out.content_type.data = resp_content_type->data;
-
-    /* Get the content length of the body. */
-    r->headers_out.content_length_n = ngx_buf_size(b);
-
-    /* Send the headers */
-    if ( ngx_http_send_header(r) == NGX_ERROR) {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "response processing failed.");
-        // ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-        return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    /* Insertion in the buffer chain. */
-    out.buf = b;
-    out.next = NULL; /* just one buffer */
-
-    /* Send the body, and return the status code of the output filter chain. */
-    // ngx_http_finalize_request(r, ngx_http_output_filter(r, &out)); // only using when request client body
-    return ngx_http_output_filter(r, &out);
 }
 
 /****Download Feature Support ****/

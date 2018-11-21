@@ -229,7 +229,6 @@ void ngx_link_func_write_resp_l(ngx_link_func_ctx_t *ctx, uintptr_t status_code,
 //     ngx_http_link_func_srv_post_conf_handler
 // };
 
-
 /**
  * This module provided directive.
  */

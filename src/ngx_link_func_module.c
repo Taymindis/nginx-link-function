@@ -1077,7 +1077,9 @@ ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ng
     ngx_http_link_func_internal_ctx_t   *ctx = data;
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "subrequest parallel done:%ui", r->headers_out.status);
-    ctx->subreq_parallel_wait_cnt--;
+    if (ctx->subreq_parallel_wait_cnt) {
+        ctx->subreq_parallel_wait_cnt--;
+    }
     return rc;
 }
 static ngx_int_t
@@ -1085,7 +1087,9 @@ ngx_http_link_func_subreqest_sequential_done(ngx_http_request_t *r, void *data, 
     ngx_http_link_func_internal_ctx_t   *ctx = data;
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "subrequest sequential done:%ui", r->headers_out.status);
-    ctx->subreq_sequential_wait_cnt--;
+    if (ctx->subreq_sequential_wait_cnt) {
+        ctx->subreq_sequential_wait_cnt--;
+    }
     return rc;
 }
 

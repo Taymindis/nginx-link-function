@@ -1123,7 +1123,7 @@ ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_
     }
 
 
-    if (ngx_http_subrequest(r, &subreq->uri, args, &sr, ps, NGX_HTTP_SUBREQUEST_WAITED) == NGX_ERROR) {
+    if (ngx_http_subrequest(r, &subreq->uri, args, &sr, ps, NGX_HTTP_SUBREQUEST_IN_MEMORY) == NGX_ERROR) {
         return NGX_ERROR;
     }
 

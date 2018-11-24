@@ -151,7 +151,7 @@ foo: foovalue
 
 
 
-=== TEST 10: Authentication with nginx link function header
+=== TEST 10: sub request with nginx link function header
 --- config
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location /backend {
@@ -164,7 +164,7 @@ location = /auth {
 location = /my_simple_authentication {  
   ngx_link_func_add_req_header userId $arg_userId;
   ngx_link_func_add_req_header userPass $arg_userPass;
-  auth_request /auth;
+  ngx_link_func_subrequest /auth;
   proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
 }
 --- request
@@ -172,10 +172,12 @@ GET /my_simple_authentication?userId=foo&userPass=xxxx
 --- error_code: 200
 --- response_body_like eval
 qr/Welcome foo$/
+--- skip_nginx
+1: < 1.13.4
 
 
 
-=== TEST 11: Authentication with nginx link function header
+=== TEST 11: sub request with nginx link function header
 --- config
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location /backend {
@@ -186,7 +188,7 @@ location = /auth {
     ngx_link_func_call "my_simple_authentication";
 }
 location = /my_simple_authentication {  
-  auth_request /auth;
+  ngx_link_func_subrequest /auth;
   proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
 }
 --- request
@@ -197,9 +199,8 @@ userPass:asdasds
 --- error_code: 200
 --- response_body_like eval
 qr/Welcome foo$/
-
-
-# Test Suite below is aio threads
+--- skip_nginx
+1: < 1.13.4
 
 
 === TEST 21: aio threads Set LINK_FUNC_TEST_1
@@ -355,7 +356,7 @@ foo: foovalue
 
 
 
-=== TEST 30: aio threads Authentication with nginx link function header
+=== TEST 30: aio threads sub request with nginx link function header
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -370,7 +371,7 @@ location = /auth {
 location = /my_simple_authentication {  
   ngx_link_func_add_req_header userId $arg_userId;
   ngx_link_func_add_req_header userPass $arg_userPass;
-  auth_request /auth;
+  ngx_link_func_subrequest /auth;
   proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
 }
 --- request
@@ -378,10 +379,12 @@ GET /my_simple_authentication?userId=foo&userPass=xxxx
 --- error_code: 200
 --- response_body_like eval
 qr/Welcome foo$/
+--- skip_nginx
+1: < 1.13.4
 
 
 
-=== TEST 31: aio threads Authentication with client header
+=== TEST 31: aio threads sub request with client header
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
@@ -394,7 +397,7 @@ location = /auth {
     ngx_link_func_call "my_simple_authentication";
 }
 location = /my_simple_authentication {
-  auth_request /auth;
+  ngx_link_func_subrequest /auth;
   proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
 }
 --- request
@@ -405,4 +408,6 @@ userPass:asdasds
 --- error_code: 200
 --- response_body_like eval
 qr/Welcome foo$/
+--- skip_nginx
+1: < 1.13.4
 

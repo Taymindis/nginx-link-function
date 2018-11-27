@@ -548,9 +548,10 @@ ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf
                 if (e[j].name.len == values[i].len
                         && ngx_strcasecmp(e[j].name.data, values[i].data) == 0) {
                     subreq->flag = e[j].value;
-#if(nginx_version < 1013010)
+// #if(nginx_version < 1013010)
+#if(NGX_THREADS)
                     if (subreq->flag == NGX_SUBREQ_PARALLEL) {
-                        return "parallel request is not applicable to nginx version less than 1.13.10.";
+                        return "parallel request is not applicable in aio threads yet.";
                     }
 #endif
                     break;

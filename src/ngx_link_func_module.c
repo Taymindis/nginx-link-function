@@ -159,7 +159,7 @@ static char *ngx_http_link_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, 
 #if (nginx_version > 1013003)
 static char *ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 // static ngx_int_t ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
-static ngx_int_t ngx_http_link_func_subreqest_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
+static ngx_int_t ngx_http_link_func_subrequest_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
 static ngx_int_t ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_subreq_conf_t *subreq, ngx_http_link_func_internal_ctx_t *ctx);
 #endif
 static ngx_int_t ngx_http_link_func_content_handler(ngx_http_request_t *r);
@@ -1109,7 +1109,7 @@ ngx_http_link_func_after_process(ngx_event_t *ev) {
 //     return rc;
 // }
 static ngx_int_t
-ngx_http_link_func_subreqest_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
+ngx_http_link_func_subrequest_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
     ngx_http_link_func_internal_ctx_t   *ctx = data;
     ngx_uint_t                          status = r->headers_out.status;
 
@@ -1155,7 +1155,7 @@ ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_
         ctx->status_check = 1;
     }
 
-    ps->handler = ngx_http_link_func_subreqest_done;
+    ps->handler = ngx_http_link_func_subrequest_done;
     ctx->subreq_sequential_wait_cnt++;
     rc = NGX_DONE;
 

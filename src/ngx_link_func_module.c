@@ -46,14 +46,16 @@
 */
 #if (nginx_version > 1013003)
 
-#define NGX_SUBREQ_SEQUENTIAL        0
-#define NGX_SUBREQ_PARALLEL          1
-#define NGX_SUBREQ_SEQUENTIAL_CHK    2
+#define NGX_SUBREQ_NORMAL        0
+#define NGX_SUBREQ_CHECK_STATUS  1
+#define NGX_SUBREQ_INCL_BODY     2
+#define NGX_SUBREQ_INCL_ARGS     3
 
 static ngx_conf_enum_t ngx_http_link_func_subrequest_flags[] = {
-    { ngx_string("sequential"), NGX_SUBREQ_SEQUENTIAL }, // subrequest run synchronizely but waiting for response
-    { ngx_string("sequential_check"), NGX_SUBREQ_SEQUENTIAL_CHK }, // subrequest run synchronizely but waiting for response and check status
-    { ngx_string("parallel"), NGX_SUBREQ_PARALLEL }, // subrequest run parallely but waiting for response
+    { ngx_string("check_status"), NGX_SUBREQ_CHECK_STATUS }, // subrequest run synchronizely but waiting for response and check status
+    { ngx_string("incl_body"), NGX_SUBREQ_INCL_BODY }, // include body with the subrequest
+    { ngx_string("incl_args"), NGX_SUBREQ_INCL_ARGS }, // include args with the subrequest
+    // { ngx_string("parallel"), NGX_SUBREQ_PARALLEL }, // subrequest run parallely but waiting for response
     { ngx_null_string, 0 }
 };
 #endif
@@ -100,9 +102,10 @@ typedef struct {
 #if (nginx_version > 1013003)
 typedef struct {
     ngx_str_t           uri;
-    ngx_uint_t          flag;
+    // ngx_uint_t          flag;
     ngx_flag_t          incl_args;
     ngx_flag_t          incl_body;
+    ngx_flag_t          check_status;
 } ngx_http_link_func_subreq_conf_t;
 #endif
 
@@ -155,8 +158,8 @@ static char *ngx_http_link_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_comm
 static char *ngx_http_link_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 #if (nginx_version > 1013003)
 static char *ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-static ngx_int_t ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
-static ngx_int_t ngx_http_link_func_subreqest_sequential_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
+// static ngx_int_t ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
+static ngx_int_t ngx_http_link_func_subreqest_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
 static ngx_int_t ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_subreq_conf_t *subreq, ngx_http_link_func_internal_ctx_t *ctx);
 #endif
 static ngx_int_t ngx_http_link_func_content_handler(ngx_http_request_t *r);
@@ -542,26 +545,39 @@ ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf
     for (i = 1; i < cf->args->nelts; i++) {
         if (i == 1) {
             subreq->uri = values[i];
-        } else if (i == 2) {
+        } else {
             e = ngx_http_link_func_subrequest_flags;
             for (j = 0; e[j].name.len != 0; j++) {
                 if (e[j].name.len == values[i].len
                         && ngx_strcasecmp(e[j].name.data, values[i].data) == 0) {
-                    subreq->flag = e[j].value;
-// #if(nginx_version < 1013010)
-#if(NGX_THREADS)
-                    if (subreq->flag == NGX_SUBREQ_PARALLEL) {
-                        return "parallel request is not applicable in aio threads yet.";
+                    // subreq->flag = e[j].value;
+// #if(NGX_THREADS)
+//                     if (subreq->flag == NGX_SUBREQ_PARALLEL) {
+//                         return "parallel request is not applicable in aio threads yet.";
+//                     }
+// #endif
+                    switch (e[j].value) {
+                    case NGX_SUBREQ_CHECK_STATUS:
+                        subreq->check_status = 1;
+                        break;
+                    case NGX_SUBREQ_INCL_ARGS:
+                        subreq->incl_args = 1;
+                        break;
+                    case NGX_SUBREQ_INCL_BODY:
+                        subreq->incl_body = 1;
+                        break;
+                    default:
+                        return "invalid subrequest flag given, either incl_args, incl_body or check_status.";
                     }
-#endif
                     break;
                 }
             }
 
             if (e[j].name.len == 0) {
-                return "invalid subrequest flag given, either parallel, sequential or sequential_check.";
+                return "invalid subrequest flag given, either incl_args, incl_body or check_status.";
             }
-        } else if (i == 3) {
+
+        } /*else if (i == 3) {
             if ( (sizeof("on") - 1) == values[i].len && ngx_strcasecmp((u_char*)"on", values[i].data) == 0) {
                 subreq->incl_args = 1;
             }
@@ -569,7 +585,7 @@ ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf
             if ( (sizeof("on") - 1) == values[i].len && ngx_strcasecmp((u_char*)"on", values[i].data) == 0) {
                 subreq->incl_body = 1;
             }
-        }
+        }*/
     }
     return NGX_CONF_OK;
 }
@@ -1080,20 +1096,20 @@ ngx_http_link_func_after_process(ngx_event_t *ev) {
 #endif
 
 #if (nginx_version > 1013003)
-static ngx_int_t
-ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
-    ngx_http_link_func_internal_ctx_t   *ctx = data;
-    ngx_uint_t                          status = r->headers_out.status;
+// static ngx_int_t
+// ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
+//     ngx_http_link_func_internal_ctx_t   *ctx = data;
+//     ngx_uint_t                          status = r->headers_out.status;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "subrequest parallel done:%ui", status);
-    if (status) {
-        ctx->subreq_parallel_wait_cnt--;
-    }
-    return rc;
-}
+//     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+//                    "subrequest parallel done:%ui", status);
+//     if (status) {
+//         ctx->subreq_parallel_wait_cnt--;
+//     }
+//     return rc;
+// }
 static ngx_int_t
-ngx_http_link_func_subreqest_sequential_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
+ngx_http_link_func_subreqest_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
     ngx_http_link_func_internal_ctx_t   *ctx = data;
     ngx_uint_t                          status = r->headers_out.status;
 
@@ -1135,30 +1151,17 @@ ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_
     }
     ps->data = ctx;
 
-    switch (subreq->flag) {
-    case NGX_SUBREQ_PARALLEL:
-        ps->handler = ngx_http_link_func_subreqest_parallel_done;
-        ctx->subreq_parallel_wait_cnt++;
-        rc = NGX_AGAIN;
-        break;
-    case NGX_SUBREQ_SEQUENTIAL_CHK:
-        ps->handler = ngx_http_link_func_subreqest_sequential_done;
-        ctx->subreq_sequential_wait_cnt++;
+    if (subreq->check_status) {
         ctx->status_check = 1;
-        rc = NGX_DONE;
-        break;
-    case NGX_SUBREQ_SEQUENTIAL:
-    default:
-        ps->handler = ngx_http_link_func_subreqest_sequential_done;
-        ctx->subreq_sequential_wait_cnt++;
-        rc = NGX_DONE;
-        // ps = NULL;
-        break;
     }
+
+    ps->handler = ngx_http_link_func_subreqest_done;
+    ctx->subreq_sequential_wait_cnt++;
+    rc = NGX_DONE;
 
     ctx->subreq_curr_index++;
 
-    if (ngx_http_subrequest(r, &subreq->uri, args, &sr, ps, NGX_HTTP_SUBREQUEST_IN_MEMORY) == NGX_ERROR) {
+    if (ngx_http_subrequest(r, &subreq->uri, args, &sr, ps, NGX_HTTP_SUBREQUEST_WAITED) == NGX_ERROR) {
         return NGX_ERROR;
     }
 
@@ -1203,7 +1206,7 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
 
 #if (nginx_version > 1013003)
     ngx_int_t                           rc;
-    ngx_uint_t                       i, n_sub_reqs;
+    ngx_uint_t                       i;//, n_sub_reqs;
     ngx_http_link_func_subreq_conf_t *subreqs, *subreq;
 
     if (lcf->_handler == NULL && lcf->subrequests == NULL) {
@@ -1237,25 +1240,26 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
         }
 
 
-        n_sub_reqs = lcf->subrequests->nelts;
+        // n_sub_reqs = lcf->subrequests->nelts;
+        i = internal_ctx->subreq_curr_index;
         subreqs = lcf->subrequests->elts;
 
-        for (i = internal_ctx->subreq_curr_index; i < n_sub_reqs; i++) {
+        if (i < lcf->subrequests->nelts) {
             subreq = subreqs + i;
             if ( (rc = ngx_http_link_func_process_subrequest(r, subreq, internal_ctx)) == NGX_ERROR ) {
                 return NGX_ERROR;
             }
 
-            if (rc == NGX_AGAIN) {
-                continue;
-            }
+            // if (rc == NGX_AGAIN) {
+            //     continue;
+            // }
 
             return rc; /*NGX_DONE*/
         }
 
-        if (internal_ctx->subreq_parallel_wait_cnt) {
-            return NGX_DONE;
-        }
+        // if (internal_ctx->subreq_parallel_wait_cnt) {
+        //     return NGX_DONE;
+        // }
     }
 
     if (lcf->_handler == NULL) {

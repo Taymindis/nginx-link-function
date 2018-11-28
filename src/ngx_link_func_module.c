@@ -132,7 +132,7 @@ typedef struct {
     ngx_int_t rc;
 #if (nginx_version > 1013003)
     ngx_uint_t        subreq_curr_index;
-    ngx_uint_t        subreq_parallel_wait_cnt;
+    // ngx_uint_t        subreq_parallel_wait_cnt;
     ngx_uint_t        subreq_sequential_wait_cnt;
     ngx_flag_t        status_check;
 #endif
@@ -1233,9 +1233,9 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
         }
 
         if ( internal_ctx->status_code && internal_ctx->rc == NGX_CONF_UNSET) {
-            if ( !internal_ctx->subreq_parallel_wait_cnt) {
+            // if ( !internal_ctx->subreq_parallel_wait_cnt) {
                 ngx_http_finalize_request(r, internal_ctx->status_code);
-            }
+            // }
             return NGX_DONE;
         }
 

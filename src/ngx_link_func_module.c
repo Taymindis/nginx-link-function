@@ -1686,7 +1686,7 @@ ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key) {
             i = 0;
         }
 
-        if (ngx_strncmp(key, header[i].key.data , header[i].key.len) == 0 ) {
+        if (ngx_strncasecmp( (u_char*) key, header[i].key.data , header[i].key.len) == 0 ) {
             u_char *ret = ngx_pcalloc(r->pool, header[i].value.len + 1);
             ngx_memcpy(ret, header[i].value.data, header[i].value.len);
             return ret;

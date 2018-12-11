@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_link_func_module_version_30 30
+#define ngx_link_func_module_version_31 31
 
 
 #define ngx_link_func_content_type_plaintext "text/plain"
@@ -68,7 +68,7 @@ extern void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);
 extern void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
 extern void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
 
-extern u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key);
+extern u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key, size_t keylen);
 extern void* ngx_link_func_get_query_param(ngx_link_func_ctx_t *ctx, const char *key);
 extern void* ngx_link_func_palloc(ngx_link_func_ctx_t *ctx, size_t size);
 extern void* ngx_link_func_pcalloc(ngx_link_func_ctx_t *ctx, size_t size);

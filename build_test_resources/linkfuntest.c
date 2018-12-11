@@ -63,7 +63,7 @@ void my_app_simple_get_calloc_from_pool(ngx_link_func_ctx_t *ctx) {
 }
 
 void my_app_simple_get_header_param(ngx_link_func_ctx_t *ctx) {
-    u_char *req_content_type = ngx_link_func_get_header(ctx, "Host");
+    u_char *req_content_type = ngx_link_func_get_header(ctx, "Host", sizeof("Host") - 1);
 
     if (req_content_type) {
         ngx_link_func_log_info(ctx, req_content_type);
@@ -86,8 +86,8 @@ char* login(const char* userId, const char*pass) {
 void my_simple_authentication(ngx_link_func_ctx_t *ctx) {
 
     ngx_link_func_log_info(ctx, "Authenticating");
-    char *userId = (char*) ngx_link_func_get_header(ctx, "userId");
-    char *userPass = (char*) ngx_link_func_get_header(ctx, "userPass");
+    char *userId = (char*) ngx_link_func_get_header(ctx, "userId", sizeof("userId") - 1);
+    char *userPass = (char*) ngx_link_func_get_header(ctx, "userPass", sizeof("userPass") - 1);
     char* userName;
 
     if ( userId == NULL || strlen(userId) == 0) {

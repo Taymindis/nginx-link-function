@@ -206,7 +206,7 @@ void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
 char *ngx_link_func_strdup(ngx_link_func_ctx_t *ctx, const char *src);
-u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key);
+u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key, size_t keylen);
 int ngx_link_func_add_header_in(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len );
 int ngx_link_func_add_header_out(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len );
 void* ngx_link_func_get_query_param(ngx_link_func_ctx_t *ctx, const char *key);
@@ -711,7 +711,7 @@ ngx_http_link_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_ERROR;
 #endif
 
-#ifndef ngx_link_func_module_version_30
+#ifndef ngx_link_func_module_version_31
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the ngx_http_link_func_module.h might not be latest or not found in the c header path, \
         please copy latest ngx_http_link_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -1670,11 +1670,12 @@ ngx_http_link_func_strdup_with_p(ngx_pool_t *pool, const char *src, size_t len) 
 }
 
 u_char*
-ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key) {
+ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key, size_t keylen) {
     ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
     ngx_list_part_t *part = &r->headers_in.headers.part;
     ngx_table_elt_t *header = part->elts;
     unsigned int i;
+    size_t header_len;
     for (i = 0; /* void */; i++) {
         if (i >= part->nelts) {
             if (part->next == NULL) {
@@ -1686,7 +1687,8 @@ ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key) {
             i = 0;
         }
 
-        if (ngx_strncasecmp( (u_char*) key, header[i].key.data , header[i].key.len) == 0 ) {
+        header_len = header[i].key.len;
+        if ( header_len == keylen && ngx_strncasecmp( (u_char*) key, header[i].key.data , header_len) == 0 ) {
             u_char *ret = ngx_pcalloc(r->pool, header[i].value.len + 1);
             ngx_memcpy(ret, header[i].value.data, header[i].value.len);
             return ret;

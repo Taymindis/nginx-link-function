@@ -44,7 +44,7 @@
 * Configs
 *
 */
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
 
 #define NGX_SUBREQ_NORMAL        0
 #define NGX_SUBREQ_CHECK_STATUS  1
@@ -99,7 +99,7 @@ typedef struct {
     ngx_http_complex_value_t   value;
 } ngx_http_link_func_req_header_t;
 
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
 typedef struct {
     ngx_str_t           uri;
     // ngx_uint_t          flag;
@@ -113,7 +113,7 @@ typedef struct {
     ngx_str_t                      _method_name;
     ngx_http_link_func_app_handler _handler;
     ngx_array_t                    *ext_req_headers;
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     ngx_array_t                    *subrequests;
 #endif
     // ngx_msec_t proc_timeout;
@@ -130,7 +130,7 @@ typedef struct {
     ngx_str_t content_type;
     ngx_buf_t *resp_content;
     ngx_int_t rc;
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     ngx_uint_t        subreq_curr_index;
     // ngx_uint_t        subreq_parallel_wait_cnt;
     ngx_uint_t        subreq_sequential_wait_cnt;
@@ -156,7 +156,7 @@ static void * ngx_http_link_func_create_loc_conf(ngx_conf_t *cf);
 static char * ngx_http_link_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
 static char *ngx_http_link_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_link_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
 static char *ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 // static ngx_int_t ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
 static ngx_int_t ngx_http_link_func_subrequest_done(ngx_http_request_t *r, void *data, ngx_int_t rc);
@@ -278,7 +278,7 @@ static ngx_command_t ngx_http_link_func_commands[] = {
         0,
         NULL
     },
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     {   ngx_string("ngx_link_func_subrequest"), /* directive */
         NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_1MORE, /* location context and takes up to 4 arguments*/
         ngx_http_link_func_subrequest_cmd, /* configuration setup function */
@@ -517,7 +517,7 @@ ngx_http_link_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_command_t *cmd, v
     return NGX_CONF_OK;
 }
 
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
 
 static char *
 ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
@@ -1021,7 +1021,7 @@ ngx_http_link_func_create_loc_conf(ngx_conf_t *cf) {
     }
 
     conf->ext_req_headers = NGX_CONF_UNSET_PTR;
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     conf->subrequests = NGX_CONF_UNSET_PTR;
 #endif
     return conf;
@@ -1035,7 +1035,7 @@ ngx_http_link_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     ngx_http_link_func_loc_conf_t *conf = child;
 
     ngx_conf_merge_ptr_value(conf->ext_req_headers, prev->ext_req_headers, NULL);
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     ngx_conf_merge_ptr_value(conf->subrequests, prev->subrequests, NULL);
 #endif
     // ngx_conf_merge_str_value(conf->_method_name, prev->_method_name, "");
@@ -1088,14 +1088,13 @@ ngx_http_link_func_after_process(ngx_event_t *ev) {
     r->main->blocked--;
     r->aio = 0;
 
-    // Force to run core run phase to avoid write handler is empty handler
-    // r->write_event_handler(r);
-    ngx_http_core_run_phases(r);
+    r->write_event_handler(r);
+    // ngx_http_core_run_phases(r);
     ngx_http_run_posted_requests(c);
 }
 #endif
 
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
 // static ngx_int_t
 // ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
 //     ngx_http_link_func_internal_ctx_t   *ctx = data;
@@ -1161,7 +1160,7 @@ ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_
 
     ctx->subreq_curr_index++;
 
-    if (ngx_http_subrequest(r, &subreq->uri, args, &sr, ps, NGX_HTTP_SUBREQUEST_WAITED) == NGX_ERROR) {
+    if (ngx_http_subrequest(r, &subreq->uri, args, &sr, ps, NGX_HTTP_SUBREQUEST_WAITED |  NGX_HTTP_SUBREQUEST_IN_MEMORY ) == NGX_ERROR) {
         return NGX_ERROR;
     }
 
@@ -1204,7 +1203,7 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
     ngx_http_link_func_internal_ctx_t  *internal_ctx;
     ngx_link_func_ctx_t                *new_ctx;
 
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     ngx_int_t                           rc;
     ngx_uint_t                       i;//, n_sub_reqs;
     ngx_http_link_func_subreq_conf_t *subreqs, *subreq;
@@ -1226,6 +1225,7 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
     }
 
 #if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     if ( lcf->subrequests ) {
 
         if (internal_ctx->subreq_sequential_wait_cnt) {
@@ -1260,13 +1260,14 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
         // if (internal_ctx->subreq_parallel_wait_cnt) {
         //     return NGX_DONE;
         // }
-    }
+    }    
 
     if (lcf->_handler == NULL) {
         // ngx_http_finalize_request(r, NGX_DONE);
         return NGX_DECLINED;
     }
-
+#endif
+#if (NGX_THREADS)    
     if (internal_ctx->rc == NGX_CONF_UNSET) {
         goto new_task;
     }
@@ -1276,9 +1277,8 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
     } else {
         return NGX_DECLINED;
     }
-
-
 new_task:
+#endif
 #endif
     new_ctx = ngx_pcalloc(r->pool, sizeof(ngx_link_func_ctx_t));
     new_ctx->__r__ = r;
@@ -1405,7 +1405,9 @@ REQUEST_BODY_DONE:
         return NGX_ERROR;
     }
     r->main->blocked++;
-    r->aio = 1;
+    r->aio = 1;    
+    // Force to run core run phase to avoid write handler is empty handler
+    r->write_event_handler = ngx_http_core_run_phases;
     return NGX_DONE;
 single_thread:
 #else
@@ -1540,7 +1542,7 @@ ngx_http_link_func_rewrite_handler(ngx_http_request_t *r) {
         ngx_http_link_func_parse_ext_request_headers(r, lcf->ext_req_headers);
     }
 
-#if (nginx_version > 1013003)
+#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     if (lcf->_handler == NULL && lcf->subrequests == NULL) {
         return NGX_DECLINED;
     }

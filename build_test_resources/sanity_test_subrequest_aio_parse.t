@@ -1,5 +1,7 @@
-=== TEST 101: sub request with nginx link function header
+=== TEST 103: aio threads sub request with nginx link function header
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location /backend {
     return 200 "Welcome ${arg_userName}";
@@ -24,8 +26,10 @@ qr/Welcome foo$/
 
 
 
-=== TEST 102: sub request with nginx link function header
+=== TEST 104: aio threads sub request with client header
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location /backend {
     return 200 "Welcome ${arg_userName}";
@@ -34,7 +38,7 @@ location = /auth {
     internal;
     ngx_link_func_call "my_simple_authentication";
 }
-location = /my_simple_authentication {  
+location = /my_simple_authentication {
   auth_request /auth;
   proxy_pass http://127.0.0.1:${server_port}/backend?userName=$http_userName;
 }

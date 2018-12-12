@@ -1,23 +1,7 @@
-# Test Suite to parse the relevant variable the sanity.t once built
-
-use lib 'inc';
-use lib 'lib';
-use Test::Nginx::Socket 'no_plan';
-
-our $main_conf = <<'_EOC_';
-    thread_pool my_thread_pool threads=8 max_queue=8;
-_EOC_
-
-no_long_string();
-
-run_tests();
-
-#no_diff();
-
-__DATA__
-
-=== TEST 1: Set LINK_FUNC_TEST_1
+=== TEST 51: aio threads Set LINK_FUNC_TEST_1
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /testLinkFunGreeting {
     ngx_link_func_call "my_app_simple_get_greeting";
@@ -31,8 +15,10 @@ Content-Type: text/plain
 qr/greeting from ngx_link_func testing$/
 
 
-=== TEST 2: Set LINK_FUNC_TEST_ARGS
+=== TEST 52: aio threads Set LINK_FUNC_TEST_ARGS
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /testLinkFunARGS {
     ngx_link_func_call "my_app_simple_get_args";
@@ -46,8 +32,10 @@ Content-Type: text/plain
 qr/greeting=hello_nginx\?id=129310923$/
 
 
-=== TEST 3: Set LINK_FUNC_TEST_POST_NONE
+=== TEST 53: aio threads Set LINK_FUNC_TEST_POST_NONE
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /testLinkFunPOSTBody {
     ngx_link_func_call "my_app_simple_post";
@@ -62,8 +50,10 @@ Content-Type: text/plain
 qr/\s/
 
 
-=== TEST 4: Set LINK_FUNC_TEST_GET_TOKEN
+=== TEST 54: aio threads Set LINK_FUNC_TEST_GET_TOKEN
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /testLinkFunCVerifyToken {
     ngx_link_func_call "my_app_simple_get_token_args";
@@ -77,8 +67,10 @@ Content-Type: text/plain
 qr/QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc2Rhcw==$/
 
 
-=== TEST 5: Set LINK_FUNC_TEST_GET_ERROR_RESP
+=== TEST 55: aio threads Set LINK_FUNC_TEST_GET_ERROR_RESP
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /testLinkFuncERRORRESP {
     error_log /dev/null;
@@ -91,8 +83,10 @@ GET /testLinkFuncERRORRESP?token=QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGt
 Content-Type: text/html
 
 
-=== TEST 6: Set LINK_FUNC_TEST_GET_CALLOC_FROM_POOL
+=== TEST 56: aio threads Set LINK_FUNC_TEST_GET_CALLOC_FROM_POOL
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /testLinkFuncCallocFromPool {
     ngx_link_func_call "my_app_simple_get_calloc_from_pool";
@@ -106,8 +100,10 @@ Content-Type: text/plain
 qr/This is the message calloc from pool$/
 
 
-=== TEST 7: Set LINK_FUNC_TEST_POST_BODY
+=== TEST 57: aio threads Set LINK_FUNC_TEST_POST_BODY
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /testLinkFunPOSTBody {
     ngx_link_func_call "my_app_simple_post";
@@ -122,8 +118,10 @@ Content-Type: text/plain
 qr/greeting=enjoy-http-link-function-testing$/
 
 
-=== TEST 8: Set LINK_FUNC_TEST_CACHE
+=== TEST 58: aio threads Set LINK_FUNC_TEST_CACHE
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /testLinkFunGetCache {
     ngx_link_func_call "my_app_simple_get_cache";
@@ -137,8 +135,10 @@ location = /testLinkFunSetCache {
 ["OK", "This is cache value"]
 
 
-=== TEST 9: Test output headers
+=== TEST 59: aio threads output headers
+--- main_config eval: $::main_conf
 --- config
+aio threads=my_thread_pool;
 ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
 location = /ext_header_foo {
     ngx_link_func_call "my_simple_extra_foo_header_output";

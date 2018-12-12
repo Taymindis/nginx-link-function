@@ -34,6 +34,12 @@ echo
 exit 1
 else
 cat $ngx_addon_dir/build_test_resources/sanity_test_raw_parse.t > $ngx_addon_dir/t/sanity.t
+if [ $USE_THREADS = YES ]; then
+cat $ngx_addon_dir/build_test_resources/sanity_test_aio_parse.t >> $ngx_addon_dir/t/sanity.t
+fi
+if [ $HTTP_AUTH_REQUEST = YES ]; then
+cat $ngx_addon_dir/build_test_resources/sanity_test_subrequest_parse.t >> $ngx_addon_dir/t/sanity.t
+fi
 cc -shared -o $ngx_addon_dir/t/liblinkfuntest.so -fPIC $ngx_addon_dir/build_test_resources/linkfuntest.c
 ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH="$( cd "$ngx_addon_dir" ; pwd -P )"
 sed -i "s@NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH@$ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH/t@g" $ngx_addon_dir/t/sanity.t

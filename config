@@ -70,7 +70,7 @@ echo "nginx version not support this module, please make sure nginx version is 1
 echo
 exit 1
 else
-have=NGX_LINK_FUNC_SUBREQ . auto/have
+have=DISB_NGX_LINK_FUNC_SUBREQ . auto/have
 fi
 
 

@@ -49,7 +49,9 @@
 #define ngx_link_func_content_type_jsonp "application/javascript"
 #define ngx_link_func_content_type_xformencoded "application/x-www-form-urlencoded"
 
-
+#ifndef u_char
+typedef unsigned char u_char;
+#endif
 
 typedef struct {
     char *req_args; // Uri Args

@@ -1234,7 +1234,7 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
 
         if ( internal_ctx->status_code && internal_ctx->rc == NGX_CONF_UNSET) {
             // if ( !internal_ctx->subreq_parallel_wait_cnt) {
-                ngx_http_finalize_request(r, internal_ctx->status_code);
+            ngx_http_finalize_request(r, internal_ctx->status_code);
             // }
             return NGX_DONE;
         }
@@ -1260,14 +1260,14 @@ ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
         // if (internal_ctx->subreq_parallel_wait_cnt) {
         //     return NGX_DONE;
         // }
-    }    
+    }
 
     if (lcf->_handler == NULL) {
         // ngx_http_finalize_request(r, NGX_DONE);
         return NGX_DECLINED;
     }
 #endif
-#if (NGX_THREADS)    
+#if (NGX_THREADS)
     if (internal_ctx->rc == NGX_CONF_UNSET) {
         goto new_task;
     }
@@ -1301,20 +1301,13 @@ new_task:
     }
 
     if (r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH)) {
-
-        /************Reading body ***********
-            *
-            *  Ref:: https://github.com/calio/form-input-nginx-module
-            *
-            ****************/
-        u_char              *p, *buf = NULL;
-        // u_char              *last;
+        u_char              *p, *buf;
         ngx_chain_t         *cl;
-        size_t               len;
+        size_t              len;
         ngx_buf_t           *b;
 
         if (r->request_body == NULL || r->request_body->bufs == NULL) {
-            goto REQUEST_BODY_DONE;
+            goto SKIP_REQUEST_BODY;
         }
 
         if (r->request_body->bufs->next != NULL) {
@@ -1323,18 +1316,18 @@ new_task:
                 b = cl->buf;
                 if (b->in_file) {
                     ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "insufficient client_body_buffer_size");
-                    return NGX_HTTP_INTERNAL_SERVER_ERROR;
+                    goto SKIP_REQUEST_BODY;
                 }
                 len += b->last - b->pos;
             }
             if (len == 0) {
-                goto REQUEST_BODY_DONE;
+                goto SKIP_REQUEST_BODY;
             }
 
             buf = ngx_palloc(r->pool, (len + 1) );
             if (buf == NULL) {
                 ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "insufficient memory.");
-                goto REQUEST_BODY_DONE;
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
 
             p = buf;
@@ -1342,31 +1335,22 @@ new_task:
                 p = ngx_copy(p, cl->buf->pos, cl->buf->last - cl->buf->pos);
             }
             // buf[len] = '\0';
-
-        } else {
-            b = r->request_body->bufs->buf;
-            if ((len = ngx_buf_size(b)) == 0) {
-                goto REQUEST_BODY_DONE;
-            }
-            buf = b->pos;
-            // buf[len] = '\0';
-        }
-        /************End REading ****************/
-REQUEST_BODY_DONE:
-        if (buf /*If got request body*/) {
-            ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "request_line=%V \n \
-                uri is %V\n \
-                args is %V\n \
-                extern is %V\n \
-                unparsed_uri is %V\n \
-                Size is %zu", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri, len);
-
             new_ctx->req_body = buf;
             new_ctx->req_body_len = len;
         } else {
-            new_ctx->req_body = NULL;
-            new_ctx->req_body_len = 0;
+            b = r->request_body->bufs->buf;
+            if ( !b->pos || (len = ngx_buf_size(b)) == 0) {
+                goto SKIP_REQUEST_BODY;
+            }
+            new_ctx->req_body = b->pos;
+            new_ctx->req_body_len = len;
         }
+        ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "request_line=%V \n \
+            uri is %V\n \
+            args is %V\n \
+            extern is %V\n \
+            unparsed_uri is %V\n \
+            body size is %zu", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri, len);
     } else { //if (!(r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH))) {
         if (ngx_http_discard_request_body(r) != NGX_OK) {
             return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -1377,9 +1361,8 @@ REQUEST_BODY_DONE:
                 args is %V\n \
                 extern is %V\n \
                 unparsed_uri is %V\n", &r->request_line, &r->uri, &r->args, &r->exten, &r->unparsed_uri);
-        new_ctx->req_body = NULL;
-        new_ctx->req_body_len = 0;
     }
+SKIP_REQUEST_BODY:
 
 #if (NGX_THREADS) && (nginx_version > 1013003)
     internal_ctx->aio_processing = 1;
@@ -1405,7 +1388,7 @@ REQUEST_BODY_DONE:
         return NGX_ERROR;
     }
     r->main->blocked++;
-    r->aio = 1;    
+    r->aio = 1;
     // Force to run core run phase to avoid write handler is empty handler
     r->write_event_handler = ngx_http_core_run_phases;
     return NGX_DONE;

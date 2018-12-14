@@ -50,7 +50,7 @@ sed -i '' "s@NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH@$ABSOLUTE_NGX_LINKFUNC_CURRENT_P
 else 
 if [ "$NGX_PLATFORM" != win32 ]; then
 cc -shared -o $ngx_addon_dir/t/liblinkfuntest.so -fPIC $ngx_addon_dir/build_test_resources/linkfuntest.c
-sed -i '' "s@NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH@$ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH/t/liblinkfuntest.so@g" $ngx_addon_dir/t/sanity.t
+sed -i "s@NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH@$ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH/t/liblinkfuntest.so@g" $ngx_addon_dir/t/sanity.t
 fi
 fi
 fi

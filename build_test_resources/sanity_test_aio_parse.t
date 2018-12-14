@@ -2,7 +2,7 @@
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunGreeting {
     ngx_link_func_call "my_app_simple_get_greeting";
 }
@@ -19,7 +19,7 @@ qr/greeting from ngx_link_func testing$/
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunARGS {
     ngx_link_func_call "my_app_simple_get_args";
 }
@@ -36,7 +36,7 @@ qr/greeting=hello_nginx\?id=129310923$/
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunPOSTBody {
     ngx_link_func_call "my_app_simple_post";
 }
@@ -54,7 +54,7 @@ qr/\s/
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunCVerifyToken {
     ngx_link_func_call "my_app_simple_get_token_args";
 }
@@ -71,7 +71,7 @@ qr/QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFuncERRORRESP {
     error_log /dev/null;
     ngx_link_func_call "my_app_simple_get_no_resp";
@@ -87,7 +87,7 @@ Content-Type: text/html
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFuncCallocFromPool {
     ngx_link_func_call "my_app_simple_get_calloc_from_pool";
 }
@@ -104,7 +104,7 @@ qr/This is the message calloc from pool$/
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunPOSTBody {
     ngx_link_func_call "my_app_simple_post";
 }
@@ -122,7 +122,7 @@ qr/greeting=enjoy-http-link-function-testing$/
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunGetCache {
     ngx_link_func_call "my_app_simple_get_cache";
 }
@@ -139,7 +139,7 @@ location = /testLinkFunSetCache {
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /ext_header_foo {
     ngx_link_func_call "my_simple_extra_foo_header_output";
 }

@@ -1,6 +1,6 @@
 === TEST 101: sub request with nginx link function header
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location /backend {
     return 200 "Welcome ${arg_userName}";
 }
@@ -26,7 +26,7 @@ qr/Welcome foo$/
 
 === TEST 102: sub request with nginx link function header
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location /backend {
     return 200 "Welcome ${arg_userName}";
 }

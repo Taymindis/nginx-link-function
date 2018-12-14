@@ -18,7 +18,7 @@ __DATA__
 
 === TEST 1: Set LINK_FUNC_TEST_1
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunGreeting {
     ngx_link_func_call "my_app_simple_get_greeting";
 }
@@ -33,7 +33,7 @@ qr/greeting from ngx_link_func testing$/
 
 === TEST 2: Set LINK_FUNC_TEST_ARGS
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunARGS {
     ngx_link_func_call "my_app_simple_get_args";
 }
@@ -48,7 +48,7 @@ qr/greeting=hello_nginx\?id=129310923$/
 
 === TEST 3: Set LINK_FUNC_TEST_POST_NONE
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunPOSTBody {
     ngx_link_func_call "my_app_simple_post";
 }
@@ -64,7 +64,7 @@ qr/\s/
 
 === TEST 4: Set LINK_FUNC_TEST_GET_TOKEN
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunCVerifyToken {
     ngx_link_func_call "my_app_simple_get_token_args";
 }
@@ -79,7 +79,7 @@ qr/QVNKS0pDQVNLTEpDS0xBU0pXbGtlandrbGplIGpka2FqbGthc2tsZGtqbHNrICBrZGpha2xzZGphc
 
 === TEST 5: Set LINK_FUNC_TEST_GET_ERROR_RESP
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFuncERRORRESP {
     error_log /dev/null;
     ngx_link_func_call "my_app_simple_get_no_resp";
@@ -93,7 +93,7 @@ Content-Type: text/html
 
 === TEST 6: Set LINK_FUNC_TEST_GET_CALLOC_FROM_POOL
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFuncCallocFromPool {
     ngx_link_func_call "my_app_simple_get_calloc_from_pool";
 }
@@ -108,7 +108,7 @@ qr/This is the message calloc from pool$/
 
 === TEST 7: Set LINK_FUNC_TEST_POST_BODY
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunPOSTBody {
     ngx_link_func_call "my_app_simple_post";
 }
@@ -124,7 +124,7 @@ qr/greeting=enjoy-http-link-function-testing$/
 
 === TEST 8: Set LINK_FUNC_TEST_CACHE
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /testLinkFunGetCache {
     ngx_link_func_call "my_app_simple_get_cache";
 }
@@ -139,7 +139,7 @@ location = /testLinkFunSetCache {
 
 === TEST 9: Test output headers
 --- config
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location = /ext_header_foo {
     ngx_link_func_call "my_simple_extra_foo_header_output";
 }

@@ -2,7 +2,7 @@
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location /backend {
     return 200 "Welcome ${arg_userName}";
 }
@@ -30,7 +30,7 @@ qr/Welcome foo$/
 --- main_config eval: $::main_conf
 --- config
 aio threads=my_thread_pool;
-ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH/liblinkfuntest.so";
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
 location /backend {
     return 200 "Welcome ${arg_userName}";
 }

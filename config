@@ -43,15 +43,16 @@ if [ $USE_THREADS = YES ]; then
 cat $ngx_addon_dir/build_test_resources/sanity_test_subrequest_aio_parse.t >> $ngx_addon_dir/t/sanity.t
 fi
 fi
+ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH="$( cd "$ngx_addon_dir" ; pwd -P )"
 if [ "$NGX_SYSTEM" = "Darwin" ]; then
 clang -dynamiclib -o $ngx_addon_dir/t/liblinkfuntest.dylib -fPIC $ngx_addon_dir/build_test_resources/linkfuntest.c -Wl,-undefined,dynamic_lookup
+sed -i '' "s@NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH@$ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH/t/liblinkfuntest.dylib@g" $ngx_addon_dir/t/sanity.t
 else 
 if [ "$NGX_PLATFORM" != win32 ]; then
 cc -shared -o $ngx_addon_dir/t/liblinkfuntest.so -fPIC $ngx_addon_dir/build_test_resources/linkfuntest.c
+sed -i '' "s@NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH@$ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH/t/liblinkfuntest.so@g" $ngx_addon_dir/t/sanity.t
 fi
 fi
-ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH="$( cd "$ngx_addon_dir" ; pwd -P )"
-sed -i "s@NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH@$ABSOLUTE_NGX_LINKFUNC_CURRENT_PATH/t@g" $ngx_addon_dir/t/sanity.t
 fi
 
 # with OPENSSL feature, NGX_SSL had done verification

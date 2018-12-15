@@ -319,7 +319,7 @@ ngx_module_t ngx_http_link_func_module = {
     ngx_http_link_func_commands, /* module directives */
     NGX_HTTP_MODULE, /* module type */
     NULL, /* init master */
-    ngx_http_link_func_module_init, /* init module */
+    NULL, // ngx_http_link_func_module_init, /* init module */ move module init into process init function to make it reload every time
     ngx_http_link_func_process_init, /* init process */
     NULL, /* init thread */
     NULL, /* exit thread */
@@ -819,6 +819,10 @@ ngx_http_link_func_process_init(ngx_cycle_t *cycle) {
     /** Only initialize when it is NGINX Worker or Single **/
     if (ngx_process != NGX_PROCESS_WORKER && ngx_process != NGX_PROCESS_SINGLE) {
         return NGX_OK;
+    }
+
+    if (ngx_http_link_func_module_init(cycle) == NGX_ERROR) {
+        return NGX_ERROR;
     }
 
     ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);

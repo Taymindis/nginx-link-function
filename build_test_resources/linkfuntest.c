@@ -3,8 +3,15 @@
 #include <ngx_link_func_module.h>
 
 
-/***gcc -shared -o liblinkfuntest.so -fPIC linkfuntest.c***/
-/***cp liblinkfuntest.so /etc/nginx/***/
+/* gcc -shared -o liblinkfuntest.so -fPIC linkfuntest.c  */
+/* cp liblinkfuntest.so /etc/nginx/  */
+
+/* for Darwin */
+/*
+*
+* clang -dynamiclib -o liblinkfuntest.dylib -fPIC linkfuntest.c -Wl,-undefined,dynamic_lookup
+*
+*/
 
 int is_service_on = 0;
 
@@ -13,7 +20,6 @@ void ngx_link_func_init(ngx_link_func_ctx_t* ctx) {
 
     is_service_on = 1;
 }
-
 
 void my_app_simple_get_greeting(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get");
@@ -30,7 +36,44 @@ void my_app_simple_get_greeting(ngx_link_func_ctx_t *ctx) {
     );
 }
 
+void my_app_simple_get_delay_greeting(ngx_link_func_ctx_t *ctx) {
+    ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get");
 
+    char *rep = "2 second delay greeting from ngx_link_func testing";
+    sleep(2); 
+    ngx_link_func_write_resp(
+        ctx,
+        200,
+        "200 OK",
+        "text/plain",
+        rep,
+        strlen(rep)
+    );
+}
+
+void my_app_simple_get_prop_greeting(ngx_link_func_ctx_t *ctx) {
+    ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get");
+    u_char *defaultGreeting =  ngx_link_func_get_prop(ctx, "defaultGreeting", sizeof("defaultGreeting") - 1);
+    if(defaultGreeting) {
+        ngx_link_func_write_resp(
+            ctx,
+            200,
+            "200 OK",
+            "text/plain",
+            (char*) defaultGreeting,
+            strlen(defaultGreeting)
+        );
+    } else {
+        ngx_link_func_write_resp(
+            ctx,
+            404,
+            "404 NOT FOUND",
+            "text/plain",
+            NULL,
+            0
+        );
+    }
+}
 
 void my_app_simple_get_args(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log(info, ctx, "Calling back and log from my_app_simple_get_args");

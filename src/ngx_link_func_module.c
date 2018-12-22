@@ -92,6 +92,7 @@ typedef struct {
     ngx_str_t _headers;
     ngx_str_t _ca_cart;
     ngx_queue_t *_link_func_locs_queue;
+    ngx_array_t *_props;
 } ngx_http_link_func_srv_conf_t;
 
 typedef struct {
@@ -206,7 +207,8 @@ void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
 char *ngx_link_func_strdup(ngx_link_func_ctx_t *ctx, const char *src);
-u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key, size_t keylen);
+u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
+u_char* ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 int ngx_link_func_add_header_in(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len );
 int ngx_link_func_add_header_out(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len );
 void* ngx_link_func_get_query_param(ngx_link_func_ctx_t *ctx, const char *key);
@@ -292,6 +294,13 @@ static ngx_command_t ngx_http_link_func_commands[] = {
         ngx_http_link_func_init_method, /* configuration setup function */
         NGX_HTTP_LOC_CONF_OFFSET, /* No offset. Only one context is supported. */
         offsetof(ngx_http_link_func_loc_conf_t, _method_name), /* No offset when storing the module configuration on struct. */
+        NULL
+    },
+    {   ngx_string("ngx_link_func_add_prop"), 
+        NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_TAKE2,
+        ngx_conf_set_keyval_slot,
+        NGX_HTTP_SRV_CONF_OFFSET,
+        offsetof(ngx_http_link_func_srv_conf_t, _props),
         NULL
     },
     ngx_null_command /* command termination */
@@ -711,7 +720,7 @@ ngx_http_link_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_ERROR;
 #endif
 
-#ifndef ngx_link_func_module_version_31
+#ifndef ngx_link_func_module_version_32
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the ngx_http_link_func_module.h might not be latest or not found in the c header path, \
         please copy latest ngx_http_link_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -990,8 +999,8 @@ ngx_http_link_func_create_srv_conf(ngx_conf_t *cf) {
 static char *
 ngx_http_link_func_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 {
-    // ngx_http_link_func_srv_conf_t *prev = parent;
-    // ngx_http_link_func_srv_conf_t *conf = child;
+    ngx_http_link_func_srv_conf_t *prev = parent;
+    ngx_http_link_func_srv_conf_t *conf = child;
 
 
     // ngx_conf_merge_str_value(conf->_libname, prev->_libname, "");
@@ -1010,6 +1019,11 @@ ngx_http_link_func_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     //                   "lib_name");
     //     return NGX_CONF_ERROR;
     // }
+
+    if (conf->_props == NULL) {
+        conf->_props = prev->_props;
+    }
+
     return NGX_CONF_OK;
 }
 
@@ -1659,7 +1673,7 @@ ngx_http_link_func_strdup_with_p(ngx_pool_t *pool, const char *src, size_t len) 
 }
 
 u_char*
-ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key, size_t keylen) {
+ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen) {
     ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
     ngx_list_part_t *part = &r->headers_in.headers.part;
     ngx_table_elt_t *header = part->elts;
@@ -1684,6 +1698,43 @@ ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char*key, size_t keylen
         }
     }
 }
+
+u_char*
+ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen) {
+    ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
+    ngx_http_link_func_srv_conf_t *scf;
+    ngx_uint_t nelts, i;
+    ngx_keyval_t *keyval;
+
+    if (r == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Invalid Session access");
+        return NULL;
+    }
+
+    scf = ngx_http_get_module_srv_conf(r, ngx_http_link_func_module);
+
+    if( scf == NULL ) {
+        ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Invalid link function server config");
+        return NULL;
+    }
+
+    if(scf->_props == NULL) {
+        return NULL;
+    }
+
+    nelts = scf->_props->nelts;
+    keyval = scf->_props->elts;
+
+    for (i = 0; i < nelts; i++) {
+      if ( keyval->key.len == keylen && ngx_strncasecmp(keyval->key.data, (u_char*) key, keylen) == 0) {
+        /** it is config memory pool, should not reallocate or overwrite **/
+        return keyval->value.data;          
+      }
+      keyval++;
+    }
+    return NULL;
+}
+
 
 static int
 strpos(const char *haystack, const char *needle) {

@@ -24,7 +24,7 @@ ngx_feature_incs="#include <ngx_link_func_module.h>"
 ngx_feature_path=
 ngx_feature_libs=
 # ngx_feature_exit_if_not_found=yes
-ngx_feature_test="int ngx_link_func_module_current_version_=ngx_link_func_module_version_31;"
+ngx_feature_test="int ngx_link_func_module_current_version_=ngx_link_func_module_version_32;"
 . auto/feature
 
 if [ $ngx_found != yes ]; then

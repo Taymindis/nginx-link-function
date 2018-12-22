@@ -146,6 +146,7 @@ typedef struct {
 
 static ngx_int_t ngx_http_link_func_pre_configuration(ngx_conf_t *cf);
 static ngx_int_t ngx_http_link_func_post_configuration(ngx_conf_t *cf);
+static ngx_int_t ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf);
 static char* ngx_http_link_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char* ngx_http_link_func_set_link_func_shm(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 // static char *ngx_http_link_func_srv_post_conf_handler(ngx_conf_t *cf, void *data, void *conf);
@@ -188,16 +189,16 @@ typedef struct {
     size_t body_len;
 } ngx_http_link_func_http_header_body;
 
-static int ngx_http_link_func_write_to_file(char* out_path, char* out_buff, size_t size, ngx_cycle_t *cycle);
+static int ngx_http_link_func_write_to_file(char* out_path, char* out_buff, size_t size, ngx_conf_t *cf);
 static int strpos(const char *haystack, const char *needle);
-static ngx_http_link_func_http_header_body* convert_to_http_header_body(char* final_buf, int curr_size, ngx_cycle_t *cycle);
-static int ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_t* scf, ngx_cycle_t *cycle);
-static ngx_http_link_func_http_header_body* ngx_http_link_func_read_data_from_server(int *sockfd, ngx_cycle_t *cycle);
-static ngx_http_link_func_http_header_body* ngx_http_link_func_http_request( ngx_cycle_t *cycle, ngx_http_link_func_srv_conf_t* scf);
+static ngx_http_link_func_http_header_body* convert_to_http_header_body(char* final_buf, int curr_size, ngx_conf_t *cf);
+static int ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_t* scf, ngx_conf_t *cf);
+static ngx_http_link_func_http_header_body* ngx_http_link_func_read_data_from_server(int *sockfd, ngx_conf_t *cf);
+static ngx_http_link_func_http_header_body* ngx_http_link_func_http_request( ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf);
 #if (NGX_SSL || NGX_OPENSSL)
-static int ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_srv_conf_t* scf, SSL_CTX **ctx, SSL **ssl, ngx_cycle_t *cycle);
-static ngx_http_link_func_http_header_body* ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_cycle_t *cycle);
-static ngx_http_link_func_http_header_body* ngx_http_link_func_https_request( ngx_cycle_t *cycle, ngx_http_link_func_srv_conf_t* scf);
+static int ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_srv_conf_t* scf, SSL_CTX **ctx, SSL **ssl, ngx_conf_t *cf);
+static ngx_http_link_func_http_header_body* ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_conf_t *cf);
+static ngx_http_link_func_http_header_body* ngx_http_link_func_https_request( ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf);
 #endif
 /*** End Download Feature Support ***/
 
@@ -661,6 +662,14 @@ ngx_http_link_func_post_configuration(ngx_conf_t *cf) {
 
         cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
+        if( cmcf == NULL ) {
+            return NGX_ERROR;
+        }
+
+        if( ngx_http_link_func_application_compatibility_check(cf, cmcf) == NGX_ERROR ) {
+            return NGX_ERROR;
+        }
+
         h = ngx_array_push(&cmcf->phases[NGX_HTTP_REWRITE_PHASE].handlers);
         if (h == NULL) {
             return NGX_ERROR;
@@ -696,7 +705,7 @@ ngx_http_link_func_post_configuration(ngx_conf_t *cf) {
 
     /*** Default Init for shm with 1M if pool is empty***/
     if (mcf != NULL && !mcf->is_cache_defined ) {
-        ngx_conf_log_error(NGX_LOG_INFO, cf,   0, "%s", "Init Default Share memory with 1M");
+        ngx_conf_log_error(NGX_LOG_INFO, cf, 0, "%s", "Init Default Share memory with 1M");
         ngx_str_t default_size = ngx_string("1M");
 
         ngx_shm_zone_t *shm_zone = ngx_shared_memory_add(cf, &mcf->shm_ctx->name, ngx_parse_size(&default_size), &ngx_http_link_func_module);
@@ -730,6 +739,74 @@ ngx_http_link_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_OK;
 }
 
+static ngx_int_t
+ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core_main_conf_t  *cmcf) {
+    ngx_uint_t s;
+    ngx_http_link_func_srv_conf_t *scf;
+    ngx_http_core_srv_conf_t **cscfp;
+
+    cscfp = cmcf->servers.elts;
+
+#if (NGX_THREADS) && (nginx_version > 1013003)
+    ngx_conf_log_error(NGX_LOG_NOTICE, cf, 0, " enabled aio threads for link-function module ");
+#endif
+    for (s = 0; s < cmcf->servers.nelts; s++) {
+        ngx_http_core_srv_conf_t *cscf = cscfp[s];
+        scf = cscf->ctx->srv_conf[ngx_http_link_func_module.ctx_index];
+        if (scf && scf->_libname.len > 0 ) {
+            ngx_conf_log_error(NGX_LOG_DEBUG, cf, 0, "%s", "Loading application= %V", &scf->_libname);
+
+            if (scf->_downloadlink.len > 0 ) {
+                if (ngx_strncmp(scf->_downloadlink.data, "https://", 8) == 0) {
+#if (NGX_SSL || NGX_OPENSSL)
+                    ngx_http_link_func_https_request(cf, scf);
+#endif
+                } else if (ngx_strncmp(scf->_downloadlink.data, "http://", 7) == 0) {
+                    ngx_http_link_func_http_request( cf, scf);
+                }
+            }
+
+            scf->_app = dlopen((char*) scf->_libname.data, RTLD_LAZY | RTLD_NOW);
+            if ( !scf->_app )  {
+                ngx_conf_log_error(NGX_LOG_ERR, cf,  0, "%s", "unable to initialized the Application ");
+                return NGX_ERROR;
+            } else {
+                ngx_conf_log_error(NGX_LOG_INFO, cf, 0, "Application %V loaded successfully ", &scf->_libname);
+            }
+
+            char *error;
+            /*** loop and without remove queue***/
+            ngx_queue_t* q;
+            for (q = ngx_queue_head(scf->_link_func_locs_queue);
+                    q != ngx_queue_sentinel(scf->_link_func_locs_queue);
+                    q = ngx_queue_next(q)) {
+                ngx_http_link_func_loc_q_t* cflq = (ngx_http_link_func_loc_q_t *) q;
+
+                ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
+                if ( lcf && lcf->_method_name.len > 0 )  {
+                    *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
+                    if ((error = dlerror()) != NULL) {
+                        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Error function load: %s", error);
+                        return NGX_ERROR;
+                    }
+                } else {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Ambiguous function name");
+                    return NGX_ERROR;
+                }
+            }
+
+            if (dlclose(scf->_app) != 0) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Error to unload the app lib %V", &scf->_libname);
+                return NGX_ERROR;
+            } else {
+                ngx_conf_log_error(NGX_LOG_DEBUG, cf, 0, "app \"%V\" successfully verified", &scf->_libname);
+            }
+        } else {
+            continue;
+        }
+    }
+    return NGX_OK;
+}
 
 static ngx_int_t
 ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
@@ -752,16 +829,6 @@ ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
         scf = cscf->ctx->srv_conf[ngx_http_link_func_module.ctx_index];
         if (scf && scf->_libname.len > 0 ) {
             ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "Loading application= %V", &scf->_libname);
-
-            if (scf->_downloadlink.len > 0 ) {
-                if (ngx_strncmp(scf->_downloadlink.data, "https://", 8) == 0) {
-#if (NGX_SSL || NGX_OPENSSL)
-                    ngx_http_link_func_https_request(cycle, scf);
-#endif
-                } else if (ngx_strncmp(scf->_downloadlink.data, "http://", 7) == 0) {
-                    ngx_http_link_func_http_request( cycle, scf);
-                }
-            }
 
             scf->_app = dlopen((char*) scf->_libname.data, RTLD_LAZY | RTLD_NOW);
             if ( !scf->_app )  {
@@ -2038,12 +2105,13 @@ ngx_link_func_write_resp(
 }
 
 /****Download Feature Support ****/
+
 static int
-ngx_http_link_func_write_to_file(char* out_path, char* out_buff, size_t size, ngx_cycle_t *cycle) {
+ngx_http_link_func_write_to_file(char* out_path, char* out_buff, size_t size, ngx_conf_t *cf) {
     FILE* writeFile;
 
     if ((writeFile = fopen(out_path, "w")) == NULL) {   // Open source file.
-        ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "%s", "Unable to downloaded the file to the specific location, please check if path existed");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Unable to downloaded the file to the specific location, please check if path existed");
         return 0;
     }
 
@@ -2054,14 +2122,14 @@ ngx_http_link_func_write_to_file(char* out_path, char* out_buff, size_t size, ng
 }
 
 static ngx_http_link_func_http_header_body*
-convert_to_http_header_body(char* final_buf, int curr_size, ngx_cycle_t *cycle) {
-    ngx_http_link_func_http_header_body *hhb = ngx_palloc(cycle->pool, sizeof(ngx_http_link_func_http_header_body));
+convert_to_http_header_body(char* final_buf, int curr_size, ngx_conf_t *cf) {
+    ngx_http_link_func_http_header_body *hhb = ngx_palloc(cf->pool, sizeof(ngx_http_link_func_http_header_body));
     if (hhb) {
         ngx_memset(hhb, 0, sizeof(ngx_http_link_func_http_header_body));
         int headerLen = strpos(final_buf, "\r\n\r\n") + 4;
-        hhb->header_content = ngx_pcalloc(cycle->pool, (headerLen + 1) * sizeof(char));
+        hhb->header_content = ngx_pcalloc(cf->pool, (headerLen + 1) * sizeof(char));
         ngx_memcpy(hhb->header_content, final_buf, headerLen * sizeof(char));
-        hhb->body_content = ngx_pcalloc(cycle->pool, ((curr_size - headerLen) + 1) * sizeof(char));
+        hhb->body_content = ngx_pcalloc(cf->pool, ((curr_size - headerLen) + 1) * sizeof(char));
         ngx_memcpy(hhb->body_content, final_buf + headerLen, (curr_size - headerLen) * sizeof(char));
         hhb->header_len = headerLen;
         hhb->body_len = (curr_size - headerLen);
@@ -2072,12 +2140,12 @@ convert_to_http_header_body(char* final_buf, int curr_size, ngx_cycle_t *cycle) 
 #define NGX_C_FUNC_DFT_DOWNLOAD_BYTESIZE 1024
 
 static int
-ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_t* scf, ngx_cycle_t *cycle) {
+ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_t* scf, ngx_conf_t *cf) {
     int rc;
     const char* const_url_str = (const char*) scf->_downloadlink.data;
     /**  break down parsing **/
     size_t const_url_str_len = ngx_strlen(const_url_str);
-    char* url_str = ngx_pcalloc(cycle->pool, ( const_url_str_len * sizeof(char)) + 1);
+    char* url_str = ngx_pcalloc(cf->pool, ( const_url_str_len * sizeof(char)) + 1);
     ngx_memcpy(url_str, const_url_str, const_url_str_len * sizeof(char));
 
     char *moving_buff = url_str, *temp_, *hostname = NULL , *path = NULL;
@@ -2111,10 +2179,10 @@ ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_
 
     struct hostent *host;
     struct sockaddr_in dest_addr;
-    ngx_log_error(NGX_LOG_DEBUG, cycle->log,  0, "%s\n", hostname);
-    ngx_log_error(NGX_LOG_DEBUG, cycle->log,  0, "%d\n", port);
+    ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "%s\n", hostname);
+    ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "%d\n", port);
     if ( (host = gethostbyname(hostname)) == NULL ) {
-        ngx_log_error(NGX_LOG_DEBUG, cycle->log,  0, "Can't resolve hostname %s.\n",  hostname);
+        ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "Can't resolve hostname %s.\n",  hostname);
         rc = 0;
         goto DONE;
     }
@@ -2130,14 +2198,14 @@ ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_
 
     if ( connect(*sockfd, (struct sockaddr *) &dest_addr,
                  sizeof(struct sockaddr)) == -1 ) {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Unable connect to host %s - %s on port %d.\n",
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Unable connect to host %s - %s on port %d.\n",
                       hostname, inet_ntoa(dest_addr.sin_addr), port);
         rc = 0;
     }
     rc = 1;
 
     len_of_data_msg = ngx_strlen(hostname) + 5/*Port number size*/ + ngx_strlen(path) + 101 /**Default header size**/ + scf->_headers.len;
-    u_char *data_to_send = ngx_pcalloc(cycle->pool, len_of_data_msg * sizeof(u_char));
+    u_char *data_to_send = ngx_pcalloc(cf->pool, len_of_data_msg * sizeof(u_char));
     if (scf->_headers.len > 0) {
         ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
                      "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n%s\r\n\r\n", path, hostname, port, scf->_headers.data);
@@ -2150,33 +2218,33 @@ ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_
     timeout.tv_usec = 0;
     if (setsockopt (*sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
                     sizeof(timeout)) < 0) {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "failed to set setsockopt for time out");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to set setsockopt for time out");
     }
 
     // if ( write(*sockfd , data_to_send , len_of_data_msg) != len_of_data_msg)
     if ( send(*sockfd , data_to_send , ngx_strlen(data_to_send) , 0) < 0) {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Send failed");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Send failed");
         rc = 0;
     }
 
     if (data_to_send)
-        ngx_pfree(cycle->pool, data_to_send);
+        ngx_pfree(cf->pool, data_to_send);
 
 DONE:
-    ngx_pfree(cycle->pool, url_str);
+    ngx_pfree(cf->pool, url_str);
     return rc;
 }
 
 
 static ngx_http_link_func_http_header_body*
-ngx_http_link_func_read_data_from_server(int *sockfd, ngx_cycle_t *cycle) {
+ngx_http_link_func_read_data_from_server(int *sockfd, ngx_conf_t *cf) {
     struct timeval timeout;
     timeout.tv_sec = 1; // Default 1 sec time out
     timeout.tv_usec = 0;
 
     if (setsockopt (*sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
                     sizeof(timeout)) < 0)
-        ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "failed to set setsockopt for time out");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "failed to set setsockopt for time out");
 
     char recvBuff[NGX_C_FUNC_DFT_DOWNLOAD_BYTESIZE];
     int n, curr_size = 0;
@@ -2186,37 +2254,37 @@ ngx_http_link_func_read_data_from_server(int *sockfd, ngx_cycle_t *cycle) {
     while ( (n = recv(*sockfd, recvBuff, sizeof(recvBuff) - 1, 0)) > 0 ) {
         recvBuff[n] = 0;
         tempBuff = final_buf;
-        final_buf = ngx_palloc(cycle->pool, curr_size + n);
+        final_buf = ngx_palloc(cf->pool, curr_size + n);
         if (tempBuff)
             ngx_memcpy(final_buf, tempBuff, curr_size);
         ngx_memcpy(final_buf + curr_size, recvBuff, n);
         curr_size += n;
 
         if (tempBuff) {
-            ngx_pfree(cycle->pool, tempBuff);
+            ngx_pfree(cf->pool, tempBuff);
         }
     }
 
     if (n < 0)  {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, " There is an error reading data from server");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, " There is an error reading data from server");
     }
 
-    ngx_http_link_func_http_header_body *hhb = convert_to_http_header_body(final_buf, curr_size, cycle);
-    ngx_pfree(cycle->pool, final_buf);
+    ngx_http_link_func_http_header_body *hhb = convert_to_http_header_body(final_buf, curr_size, cf);
+    ngx_pfree(cf->pool, final_buf);
     return hhb;
 }
 
 static ngx_http_link_func_http_header_body*
-ngx_http_link_func_http_request(ngx_cycle_t *cycle, ngx_http_link_func_srv_conf_t* scf) {
+ngx_http_link_func_http_request(ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf) {
     int sockfd;
     ngx_http_link_func_http_header_body* hhb = NULL;
-    if (ngx_http_link_func_connect_and_request(&sockfd, scf , cycle)) {
-        hhb = ngx_http_link_func_read_data_from_server(&sockfd, cycle);
+    if (ngx_http_link_func_connect_and_request(&sockfd, scf , cf)) {
+        hhb = ngx_http_link_func_read_data_from_server(&sockfd, cf);
         if (hhb) {
-            ngx_http_link_func_write_to_file( (char*) scf->_libname.data, hhb->body_content, hhb->body_len, cycle);
-            ngx_pfree(cycle->pool, hhb->header_content);
-            ngx_pfree(cycle->pool, hhb->body_content);
-            ngx_pfree(cycle->pool, hhb);
+            ngx_http_link_func_write_to_file( (char*) scf->_libname.data, hhb->body_content, hhb->body_len, cf);
+            ngx_pfree(cf->pool, hhb->header_content);
+            ngx_pfree(cf->pool, hhb->body_content);
+            ngx_pfree(cf->pool, hhb);
         }
     }
     close(sockfd);
@@ -2226,7 +2294,7 @@ ngx_http_link_func_http_request(ngx_cycle_t *cycle, ngx_http_link_func_srv_conf_
 #if (NGX_SSL || NGX_OPENSSL)
 
 static int
-ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_srv_conf_t* scf, SSL_CTX **ctx, SSL **ssl, ngx_cycle_t *cycle) {
+ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_srv_conf_t* scf, SSL_CTX **ctx, SSL **ssl, ngx_conf_t *cf) {
     int rc = 1;
 
     // /*** DISABLE IF NGINX ENABLED ***/
@@ -2235,10 +2303,10 @@ ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_s
     // ERR_load_crypto_strings();
     // SSL_load_error_strings();
     // if (SSL_library_init() < 0)
-    //      ngx_log_error(NGX_LOG_EMERG, cycle->log,  0,  "Could not initialize the OpenSSL library !\n");
+    //      ngx_conf_log_error(NGX_LOG_EMERG, cf,  0,  "Could not initialize the OpenSSL library !\n");
 
     if ( (*ctx = SSL_CTX_new(SSLv23_client_method())) == NULL )
-        ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "failed to establish SSL_CTX");
+        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "failed to establish SSL_CTX");
 
     SSL_CTX_set_options(*ctx, SSL_OP_NO_SSLv2);
 
@@ -2248,7 +2316,7 @@ ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_s
     /***Connecting to Socket***/
     /**  break down parsing **/
     size_t const_url_str_len = ngx_strlen(scf->_downloadlink.data);
-    char* url_str = ngx_pcalloc(cycle->pool, ( const_url_str_len * sizeof(char)) + 1);
+    char* url_str = ngx_pcalloc(cf->pool, ( const_url_str_len * sizeof(char)) + 1);
     ngx_memcpy(url_str, scf->_downloadlink.data, const_url_str_len * sizeof(char));
 
     char *moving_buff = url_str, *temp_, *hostname = NULL , *path = NULL;
@@ -2282,10 +2350,10 @@ ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_s
 
     struct hostent *host;
     struct sockaddr_in dest_addr;
-    ngx_log_error(NGX_LOG_DEBUG, cycle->log,  0, "%s\n", hostname);
-    ngx_log_error(NGX_LOG_DEBUG, cycle->log,  0, "%d\n", port);
+    ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "%s\n", hostname);
+    ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "%d\n", port);
     if ( (host = gethostbyname(hostname)) == NULL ) {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Can't resolve hostname %s.\n",  hostname);
+        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Can't resolve hostname %s.\n",  hostname);
         rc = 0;
         goto DONE;
     }
@@ -2301,7 +2369,7 @@ ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_s
 
     if ( connect(*sockfd, (struct sockaddr *) &dest_addr,
                  sizeof(struct sockaddr)) == -1 ) {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Unable connect to host %s - %s on port %d.\n",
+        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Unable connect to host %s - %s on port %d.\n",
                       hostname, inet_ntoa(dest_addr.sin_addr), port);
         rc = 0;
         goto DONE;
@@ -2311,35 +2379,35 @@ ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_s
     /*** ca cert verification ***/
     if (scf->_ca_cart.len > 0) {
         if (SSL_CTX_load_verify_locations(*ctx, (const char*) scf->_ca_cart.data, NULL) == 0) {
-            ngx_log_error(NGX_LOG_WARN, cycle->log,  0, "failed to read ca cert");
+            ngx_conf_log_error(NGX_LOG_WARN, cf,  0, "failed to read ca cert");
         }
 
         SSL_set_verify(*ssl, SSL_VERIFY_PEER, NULL);
     } else {
-        ngx_log_error(NGX_LOG_WARN, cycle->log,  0, " You are connecting without verification, recommended to provide ceert by using \"ngx_http_link_func_ca_cert\" ");
+        ngx_conf_log_error(NGX_LOG_WARN, cf,  0, " You are connecting without verification, recommended to provide ceert by using \"ngx_http_link_func_ca_cert\" ");
     }
 
     SSL_set_fd(*ssl, *sockfd);
 
     if ( SSL_connect(*ssl) != 1 ) {
-        ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Unable to connect to ssl session %s", url_str);
+        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Unable to connect to ssl session %s", url_str);
     } else {
         if (scf->_ca_cart.len > 0) {
             int vres = SSL_get_verify_result(*ssl);
-            ngx_log_error(NGX_LOG_INFO, cycle->log,  0, "X509 verified result %s", X509_verify_cert_error_string(vres));
+            ngx_conf_log_error(NGX_LOG_INFO, cf,  0, "X509 verified result %s", X509_verify_cert_error_string(vres));
             if (vres != X509_V_OK) {
-                ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "SSL verify error: %d\n", SSL_get_error(*ssl, vres));
+                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "SSL verify error: %d\n", SSL_get_error(*ssl, vres));
                 rc = 0;
                 goto DONE;
             }
         }
 
-        ngx_log_error(NGX_LOG_DEBUG, cycle->log,  0, "SSL/TLS session is enabled: %s", url_str);
+        ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "SSL/TLS session is enabled: %s", url_str);
         int r, request_len;
 
         /** Now construct our HTTP request, if using http/1.1 please specified Connection: Close to prevent keep-alive issue **/
         len_of_data_msg = ngx_strlen(hostname) + 5/*Port number size*/ + ngx_strlen(path) + 101 /**Default header size**/ + scf->_headers.len;
-        u_char *data_to_send = ngx_pcalloc(cycle->pool, len_of_data_msg * sizeof(u_char));
+        u_char *data_to_send = ngx_pcalloc(cf->pool, len_of_data_msg * sizeof(u_char));
         if (scf->_headers.len > 0) {
             ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
                          "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n%s\r\n\r\n", path, hostname, port, scf->_headers.data);
@@ -2353,28 +2421,28 @@ ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_s
         switch (SSL_get_error(*ssl, r)) {
         case SSL_ERROR_NONE:
             if (request_len != r) {
-                ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Insufficient write data to server");
+                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Insufficient write data to server");
                 rc = 0;
             }
             break;
         default:
-            ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "error while writing data to server");
+            ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "error while writing data to server");
             rc = 0;
         }
 
         if (data_to_send)
-            ngx_pfree(cycle->pool, data_to_send);
+            ngx_pfree(cf->pool, data_to_send);
 
     }
 
 
 DONE:
-    ngx_pfree(cycle->pool, url_str);
+    ngx_pfree(cf->pool, url_str);
     return rc;
 }
 
 static ngx_http_link_func_http_header_body*
-ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_cycle_t *cycle) {
+ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_conf_t *cf) {
     char recvBuff[NGX_C_FUNC_DFT_DOWNLOAD_BYTESIZE];
     int n, curr_size = 0;
     char *final_buf = NULL, *tempBuff;
@@ -2383,13 +2451,13 @@ ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_cycle_t *cycle) {
         if ((n = SSL_read(ssl, recvBuff, sizeof(recvBuff) - 1)) > 0) {
             recvBuff[n] = 0;
             tempBuff = final_buf;
-            final_buf = ngx_palloc(cycle->pool, curr_size + n);
+            final_buf = ngx_palloc(cf->pool, curr_size + n);
             if (tempBuff)
                 ngx_memcpy(final_buf, tempBuff, curr_size);
             ngx_memcpy(final_buf + curr_size, recvBuff, n);
             curr_size += n;
             if (tempBuff) {
-                ngx_pfree(cycle->pool, tempBuff);
+                ngx_pfree(cf->pool, tempBuff);
             }
         } else {
             switch (SSL_get_error(ssl, n)) {
@@ -2397,25 +2465,25 @@ ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_cycle_t *cycle) {
                 continue;
             case SSL_ERROR_ZERO_RETURN:
                 if (SSL_shutdown(ssl) != 1) {
-                    ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "%s\n", "failed to shutting down SSL");
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s\n", "failed to shutting down SSL");
                 }
                 goto done;
                 break;
             case SSL_ERROR_SYSCALL:
                 goto done;
             default:
-                ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "unknown SSL read issue");
+                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "unknown SSL read issue");
             }
         }
     }
 done:
     hhb = convert_to_http_header_body(final_buf, curr_size, cycle);
-    ngx_pfree(cycle->pool, final_buf);
+    ngx_pfree(cf->pool, final_buf);
     return hhb;
 }
 
 static ngx_http_link_func_http_header_body*
-ngx_http_link_func_https_request(ngx_cycle_t *cycle, ngx_http_link_func_srv_conf_t* scf) {
+ngx_http_link_func_https_request(ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf) {
     int sockfd = -1;
     ngx_http_link_func_http_header_body* hhb = NULL;
     SSL_CTX *ctx = NULL;
@@ -2424,9 +2492,9 @@ ngx_http_link_func_https_request(ngx_cycle_t *cycle, ngx_http_link_func_srv_conf
         hhb = ngx_http_link_func_read_data_from_server_via_ssl(ssl, cycle);
         if (hhb) {
             ngx_http_link_func_write_to_file((char*)scf->_libname.data, hhb->body_content, hhb->body_len, cycle);
-            ngx_pfree(cycle->pool, hhb->header_content);
-            ngx_pfree(cycle->pool, hhb->body_content);
-            ngx_pfree(cycle->pool, hhb);
+            ngx_pfree(cf->pool, hhb->header_content);
+            ngx_pfree(cf->pool, hhb->body_content);
+            ngx_pfree(cf->pool, hhb);
         }
     }
     if (ssl)

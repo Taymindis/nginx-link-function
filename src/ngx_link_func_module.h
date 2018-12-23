@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_link_func_module_version_32 32
+#define ngx_link_func_module_version_33 33
 
 
 #define ngx_link_func_content_type_plaintext "text/plain"
@@ -64,6 +64,28 @@ typedef struct {
     void* __pl__;
     void* __log__;
 } ngx_link_func_ctx_t;
+
+typedef struct {
+    void *shared_mem;
+    int has_error;
+    /* internal */
+    void* __cycle__;
+    void* __srv_cf__;
+    void* __pl__;
+    void* __log__;
+} ngx_link_func_cycle_t;
+
+extern u_char* ngx_link_func_cyc_get_prop(ngx_link_func_cycle_t *ctx, const char *key, size_t keylen);
+extern void ngx_link_func_cyc_log_debug(ngx_link_func_cycle_t *ctx, const char* msg);
+extern void ngx_link_func_cyc_log_info(ngx_link_func_cycle_t *ctx, const char* msg);
+extern void ngx_link_func_cyc_log_warn(ngx_link_func_cycle_t *ctx, const char* msg);
+extern void ngx_link_func_cyc_log_err(ngx_link_func_cycle_t *ctx, const char* msg);
+
+#define ngx_link_func_cyc_log(loglevel, cyc_context, ...) ({\
+char __buff__[200];\
+snprintf(__buff__, 200, ##__VA_ARGS__);\
+ngx_link_func_cyc_log_##loglevel(cyc_context, __buff__);\
+})
 
 extern void ngx_link_func_log_debug(ngx_link_func_ctx_t *ctx, const char* msg);
 extern void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);

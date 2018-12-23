@@ -15,8 +15,8 @@
 
 int is_service_on = 0;
 
-void ngx_link_func_init(ngx_link_func_ctx_t* ctx) {
-    ngx_link_func_log(info, ctx, "%s", "Starting The Application");
+void ngx_link_func_init_cycle(ngx_link_func_cycle_t* cycle) {
+    ngx_link_func_cyc_log(info, cycle, "%s", "Starting The Application");
 
     is_service_on = 1;
 }
@@ -277,11 +277,11 @@ void my_app_simple_get_no_resp(ngx_link_func_ctx_t *ctx) {
 }
 
 
-void ngx_link_func_exit(ngx_link_func_ctx_t* ctx) {
+void ngx_link_func_exit_cycle(ngx_link_func_cycle_t* cycle) {
 
-    ngx_link_func_cache_remove(ctx->shared_mem, "key");
+    ngx_link_func_cache_remove(cycle->shared_mem, "key");
 
-    ngx_link_func_log(info, ctx, "%s\n", "Shutting down The Application");
+    ngx_link_func_cyc_log(info, cycle, "%s\n", "Shutting down The Application");
 
     is_service_on = 0;
 }

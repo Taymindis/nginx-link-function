@@ -84,6 +84,7 @@ typedef struct {
 } ngx_http_link_func_main_conf_t;
 
 typedef void (*ngx_http_link_func_app_handler)(ngx_link_func_ctx_t*);
+typedef void (*ngx_http_link_func_app_cycle_handler)(ngx_link_func_cycle_t*);
 
 typedef struct {
     void *_app;
@@ -203,6 +204,12 @@ static ngx_http_link_func_http_header_body* ngx_http_link_func_https_request( ng
 /*** End Download Feature Support ***/
 
 /**Extern interface**/
+void ngx_link_func_cyc_log_debug(ngx_link_func_cycle_t *cyc, const char* msg);
+void ngx_link_func_cyc_log_info(ngx_link_func_cycle_t *cyc, const char* msg);
+void ngx_link_func_cyc_log_warn(ngx_link_func_cycle_t *cyc, const char* msg);
+void ngx_link_func_cyc_log_err(ngx_link_func_cycle_t *cyc, const char* msg);
+u_char* ngx_link_func_cyc_get_prop(ngx_link_func_cycle_t *cyc, const char *key, size_t keylen);
+
 void ngx_link_func_log_debug(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
@@ -634,18 +641,25 @@ static ngx_int_t
 ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_srv_conf_t *scf, ngx_http_link_func_main_conf_t* mcf) {
     /**** Init the client apps ngx_http_link_func_init ***/
     char *error;
-    ngx_http_link_func_app_handler func;
-    *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_init");
+    ngx_http_link_func_app_cycle_handler func;
+    *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_init_cycle");
     if ((error = dlerror()) != NULL) {
         ngx_log_error(NGX_LOG_WARN, cycle->log, 0, "Unable to init call %s , skipped init called", error);
     } else {
         ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "application initializing");
         /*** Init the apps ***/
-        ngx_link_func_ctx_t new_ctx; //config request
-        new_ctx.__pl__ = cycle->pool;
-        new_ctx.__log__ = cycle->log;
-        new_ctx.shared_mem = (void*)mcf->shm_ctx->shared_mem;
-        func(&new_ctx);
+        ngx_link_func_cycle_t appcyc;
+        appcyc.has_error = 0;
+        appcyc.__cycle__ = cycle;
+        appcyc.__srv_cf__ = scf;
+        appcyc.__pl__ = cycle->pool;
+        appcyc.__log__ = cycle->log;
+        appcyc.shared_mem = (void*)mcf->shm_ctx->shared_mem;
+        func(&appcyc);
+        if(appcyc.has_error) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "%s", "link function worker Initialize unsuccessfully");
+            return NGX_ERROR;
+        }
     }
 
     ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "%s", "Done proceed init calls");
@@ -729,7 +743,7 @@ ngx_http_link_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_ERROR;
 #endif
 
-#ifndef ngx_link_func_module_version_32
+#ifndef ngx_link_func_module_version_33
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the ngx_http_link_func_module.h might not be latest or not found in the c header path, \
         please copy latest ngx_http_link_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -775,6 +789,24 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
             }
 
             char *error;
+
+            /* * check init function block, this version has to be at least init with empty function * */
+            ngx_http_link_func_app_cycle_handler func;
+            *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_init_cycle");
+            if ((error = dlerror()) != NULL) {
+                ngx_conf_log_error(NGX_LOG_ERR, cf, 0, 
+                    "function ngx_link_func_init_cycle(ngx_link_func_cycle_t *cycle) not found in \"%V\", at least create an empty init function block \n %s", 
+                    &scf->_libname, error);
+                return NGX_ERROR;
+            }
+            *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit_cycle");
+            if ((error = dlerror()) != NULL) {
+                ngx_conf_log_error(NGX_LOG_ERR, cf, 0, 
+                    "function ngx_link_func_exit_cycle(ngx_link_func_cycle_t *cycle) not found in \"%V\", at least create an empty exit function block \n %s", 
+                    &scf->_libname, error);
+            }
+
+
             /*** loop and without remove queue***/
             ngx_queue_t* q;
             for (q = ngx_queue_head(scf->_link_func_locs_queue);
@@ -942,16 +974,22 @@ ngx_http_link_func_process_exit(ngx_cycle_t *cycle) {
         scf = cscf->ctx->srv_conf[ngx_http_link_func_module.ctx_index];
         if (scf && scf->_app ) {
             /*** Exiting the client apps ***/
-            ngx_http_link_func_app_handler func;
-            *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit");
+            ngx_http_link_func_app_cycle_handler func;
+            *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit_cycle");
             if ((error = dlerror()) != NULL) {
                 ngx_log_error(NGX_LOG_WARN, cycle->log, 0, "Unable to exit call %s , skipped exit called", error);
             } else {
-                ngx_link_func_ctx_t new_ctx; //config request
-                new_ctx.__pl__ = cycle->pool;
-                new_ctx.__log__ = cycle->log;
-                new_ctx.shared_mem = (void*)mcf->shm_ctx->shared_mem;
-                func(&new_ctx);
+                ngx_link_func_cycle_t appcyc;
+                appcyc.has_error = 0;
+                appcyc.__cycle__ = cycle;
+                appcyc.__srv_cf__ = scf;
+                appcyc.__pl__ = cycle->pool;
+                appcyc.__log__ = cycle->log;
+                appcyc.shared_mem = (void*)mcf->shm_ctx->shared_mem;
+                func(&appcyc);
+                if(appcyc.has_error) {
+                    ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "%s", "link function worker exit error");
+                }
             }
             // Unload app, unload old app if nginx reload
             if (dlclose(scf->_app) != 0) {
@@ -1701,6 +1739,23 @@ ngx_http_link_func_client_body_handler(ngx_http_request_t *r) {
 
 /****** extern interface ********/
 void
+ngx_link_func_cyc_log_debug(ngx_link_func_cycle_t *cyc, const char* msg) {
+    ngx_log_error(NGX_LOG_DEBUG, (ngx_log_t *)cyc->__log__, 0, "%s", msg);
+}
+void
+ngx_link_func_cyc_log_info(ngx_link_func_cycle_t *cyc, const char* msg) {
+    ngx_log_error(NGX_LOG_INFO, (ngx_log_t *)cyc->__log__, 0, "%s", msg);
+}
+void
+ngx_link_func_cyc_log_warn(ngx_link_func_cycle_t *cyc, const char* msg) {
+    ngx_log_error(NGX_LOG_WARN, (ngx_log_t *)cyc->__log__, 0, "%s", msg);
+}
+void
+ngx_link_func_cyc_log_err(ngx_link_func_cycle_t *cyc, const char* msg) {
+    ngx_log_error(NGX_LOG_ERR, (ngx_log_t *)cyc->__log__, 0, "%s", msg);
+}
+
+void
 ngx_link_func_log_debug(ngx_link_func_ctx_t *ctx, const char* msg) {
     ngx_log_error(NGX_LOG_DEBUG, (ngx_log_t *)ctx->__log__, 0, "%s", msg);
 }
@@ -1782,6 +1837,42 @@ ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen)
 
     if( scf == NULL ) {
         ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Invalid link function server config");
+        return NULL;
+    }
+
+    if(scf->_props == NULL) {
+        return NULL;
+    }
+
+    nelts = scf->_props->nelts;
+    keyval = scf->_props->elts;
+
+    for (i = 0; i < nelts; i++) {
+      if ( keyval->key.len == keylen && ngx_strncasecmp(keyval->key.data, (u_char*) key, keylen) == 0) {
+        /** it is config memory pool, should not reallocate or overwrite **/
+        return keyval->value.data;          
+      }
+      keyval++;
+    }
+    return NULL;
+}
+
+u_char*
+ngx_link_func_cyc_get_prop(ngx_link_func_cycle_t *cyc, const char *key, size_t keylen) {
+    ngx_http_link_func_srv_conf_t *scf;
+    ngx_uint_t nelts, i;
+    ngx_keyval_t *keyval;
+    ngx_log_t *log;
+
+    if (cyc == NULL) {
+        return NULL;
+    }
+
+    log = (ngx_log_t*) cyc->__log__;
+    scf =(ngx_http_link_func_srv_conf_t*) cyc->__srv_cf__;
+
+    if( scf == NULL || log == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, log, 0, "Invalid link function server config");
         return NULL;
     }
 

@@ -260,9 +260,8 @@ Feel free to clone a sample project on [Sample Project](https://github.com/Taymi
 
 int is_service_on = 0;
 
-void ngx_link_func_init(ngx_link_func_ctx_t* ctx) {
-    ngx_link_func_log(info, ctx, "%s", "Starting The Application");
-
+void ngx_link_func_init_cycle(ngx_link_func_cycle_t* cycle) {
+    ngx_link_func_cyc_log(info, cycle, "%s", "starting application");
 
     is_service_on=1;
 }
@@ -337,8 +336,8 @@ void my_app_simple_get_no_resp(ngx_link_func_ctx_t *ctx) {
 
 }
 
-void ngx_link_func_exit(ngx_link_func_ctx_t* ctx) {
-    ngx_link_func_log(info, ctx, "%s\n", "Shutting down The Application");
+void ngx_link_func_exit_cycle(ngx_link_func_cycle_t* cyc) {
+    ngx_link_func_cyc_log(info, cyc, "%s\n", "Shutting down/reloading the Application");
 
     is_service_on = 0;
 }

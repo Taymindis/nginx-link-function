@@ -1,5 +1,6 @@
-nginx-link-function
-===================
+![nginx link function Logo](nginx-link-function-logo.png)
+<h1 align="center">nginx-link-function</h1>
+<h3 align="center">The Application dynamic linking with Nginx </h3>
 
 
 Table of Contents

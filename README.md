@@ -1,4 +1,4 @@
-<img align="center" src="nginx-link-function-logo.png" alt="nginx link function Logo" />
+<p align="center"><img src="nginx-link-function-logo.png" alt="nginx link function Logo" /></p>
 <h1 align="center">nginx-link-function</h1>
 <h3 align="center">The Application dynamic linking with Nginx </h3>
 

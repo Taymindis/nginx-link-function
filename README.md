@@ -344,11 +344,13 @@ void ngx_link_func_exit_cycle(ngx_link_func_cycle_t* cyc) {
 ```
 
 #### Noted: 
-The function init and exit are reserved function when started the nginx, it will call init method, when stop nginx, it will call exit function.
+The function init and exit cycle are reserved function when started the nginx, it will call init cycle function, when stop/reload nginx, it will call exit cycle function.
 ```c
-void ngx_link_func_init(ngx_link_func_ctx_t* ctx){}
-void ngx_link_func_exit(ngx_link_func_ctx_t* ctx){}
+void ngx_link_func_init_cycle(ngx_link_func_cycle_t* cyc){}
+void ngx_link_func_exit_cycle(ngx_link_func_cycle_t* cyc){}
 ```
+[references: The init and exit cycle hooks in application layer](https://github.com/Taymindis/nginx-link-function/wiki/The-init-and-exit-cycle-hooks-in-application-layer)
+
 
 #### Log Level
 The log can be called, the logged message will be store where you config error log in nginx.conf

@@ -147,6 +147,7 @@ typedef struct {
 
 static ngx_int_t ngx_http_link_func_pre_configuration(ngx_conf_t *cf);
 static ngx_int_t ngx_http_link_func_post_configuration(ngx_conf_t *cf);
+static void* ngx_http_link_func_get_duplicate_handler(ngx_http_link_func_srv_conf_t *scf, ngx_str_t *method_name);
 static ngx_int_t ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core_main_conf_t *cmcf);
 static char* ngx_http_link_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char* ngx_http_link_func_set_link_func_shm(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
@@ -749,6 +750,25 @@ ngx_http_link_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_OK;
 }
 
+static void*
+ngx_http_link_func_get_duplicate_handler(ngx_http_link_func_srv_conf_t *scf, ngx_str_t *method_name) {
+    /* this is only do when init or exit application, don't be count as performance issue, this is for same method merged */
+    ngx_queue_t* q;
+    for (q = ngx_queue_head(scf->_link_func_locs_queue);
+            q != ngx_queue_sentinel(scf->_link_func_locs_queue);
+            q = ngx_queue_next(q)) {
+        ngx_http_link_func_loc_q_t* cflq = (ngx_http_link_func_loc_q_t *) q;
+        ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
+        if ( lcf && lcf->_method_name.len > 0 )  {
+            if ( lcf->_handler && lcf->_method_name.len == method_name->len &&
+                    ngx_strncmp(lcf->_method_name.data, method_name->data, method_name->len) == 0 ) {
+                return lcf->_handler;
+            }
+        }
+    }
+    return NULL;
+}
+
 static ngx_int_t
 ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core_main_conf_t  *cmcf) {
     ngx_uint_t s;
@@ -780,8 +800,6 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
             if ( !scf->_app )  {
                 ngx_conf_log_error(NGX_LOG_ERR, cf,  0, "%s", "unable to initialized the Application ");
                 return NGX_ERROR;
-            } else {
-                ngx_conf_log_error(NGX_LOG_INFO, cf, 0, "Application %V loaded successfully ", &scf->_libname);
             }
 
             char *error;
@@ -817,6 +835,7 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
                         ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Error function load: %s", error);
                         return NGX_ERROR;
                     }
+                    lcf->_handler = NULL; // reset back
                 } else {
                     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Ambiguous function name");
                     return NGX_ERROR;
@@ -828,6 +847,7 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
                 return NGX_ERROR;
             } else {
                 ngx_conf_log_error(NGX_LOG_DEBUG, cf, 0, "app \"%V\" successfully verified", &scf->_libname);
+                scf->_app = NULL; // reset back
             }
         } else {
             continue;
@@ -867,42 +887,45 @@ ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
             }
 
             char *error;
-            /*** Loop and remove queue ***/
-            while (! (ngx_queue_empty(scf->_link_func_locs_queue)) )  {
-                ngx_queue_t* q = ngx_queue_head(scf->_link_func_locs_queue);
-                ngx_http_link_func_loc_q_t* cflq = ngx_queue_data(q, ngx_http_link_func_loc_q_t, _queue);
+            /*** loop and without remove queue***/
+            ngx_queue_t* q;
+            for (q = ngx_queue_head(scf->_link_func_locs_queue);
+                    q != ngx_queue_sentinel(scf->_link_func_locs_queue);
+                    q = ngx_queue_next(q)) {
+                ngx_http_link_func_loc_q_t* cflq = (ngx_http_link_func_loc_q_t *) q;
+
                 ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
                 if ( lcf && lcf->_method_name.len > 0 )  {
-                    *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
-                    if ((error = dlerror()) != NULL) {
-                        ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Error function load: %s", error);
-                        return NGX_ERROR;
+                    if ( ( lcf->_handler = ngx_http_link_func_get_duplicate_handler(scf, &lcf->_method_name) ) == NULL ) {
+                        *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
+                        if ((error = dlerror()) != NULL) {
+                            ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Error function load: %s", error);
+                            return NGX_ERROR;
+                        }
                     }
                 } else {
                     ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "%s", "Ambiguous function name");
                     return NGX_ERROR;
                 }
-                ngx_queue_remove(q);
             }
-            /*** loop and without remove queue***/
-            // ngx_queue_t* q;
-            // for (q = ngx_queue_head(scf->_link_func_locs_queue);
-            //         q != ngx_queue_sentinel(scf->_link_func_locs_queue);
-            //         q = ngx_queue_next(q)) {
-            //     ngx_http_link_func_loc_q_t* cflq = (ngx_http_link_func_loc_q_t *) q;
 
-            //     ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
-            //     if ( lcf && lcf->_method_name.len > 0 )  {
-            //         *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
-            //         if ((error = dlerror()) != NULL) {
-            //             ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Error function load: %s", error);
-            //             return NGX_ERROR;
-            //         }
-            //     } else {
-            //         ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "%s", "Ambiguous function name");
-            //         return NGX_ERROR;
-            //     }
-            // }
+            /*** Loop and remove queue, don't retain the queue ***/
+            while (! (ngx_queue_empty(scf->_link_func_locs_queue)) )  {
+                ngx_queue_t* q = ngx_queue_head(scf->_link_func_locs_queue);
+                // ngx_http_link_func_loc_q_t* cflq = ngx_queue_data(q, ngx_http_link_func_loc_q_t, _queue);
+                // ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
+                // if ( lcf && lcf->_method_name.len > 0 )  {
+                //     *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
+                //     if ((error = dlerror()) != NULL) {
+                //         ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Error function load: %s", error);
+                //         return NGX_ERROR;
+                //     }
+                // } else {
+                //     ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "%s", "Ambiguous function name");
+                //     return NGX_ERROR;
+                // }
+                ngx_queue_remove(q);
+            }            
         } else {
             continue;
         }

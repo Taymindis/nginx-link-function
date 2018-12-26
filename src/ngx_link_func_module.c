@@ -1161,7 +1161,7 @@ ngx_http_link_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
 #if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
     ngx_conf_merge_ptr_value(conf->subrequests, prev->subrequests, NULL);
 #endif
-    // ngx_conf_merge_str_value(conf->_method_name, prev->_method_name, "");
+    ngx_conf_merge_str_value(conf->_method_name, prev->_method_name, "");
 
     // if (conf->_method_name.len == 0) {
     //     conf->_method_name = prev->_method_name;

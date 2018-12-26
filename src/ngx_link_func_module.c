@@ -623,18 +623,14 @@ ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf
 static char *
 ngx_http_link_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     ngx_http_link_func_srv_conf_t *scf;
-    ngx_http_link_func_loc_conf_t *lcf = conf;
-
 
     scf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_link_func_module);
 
     if (scf && scf->_libname.len > 0) {
-        ngx_http_link_func_loc_q_t *loc_q = ngx_pcalloc(cf->pool, sizeof(ngx_http_link_func_loc_q_t));
-        loc_q->_loc_conf = lcf;
-        ngx_queue_init(&loc_q->_queue);
-        ngx_queue_insert_tail(scf->_link_func_locs_queue, &loc_q->_queue);
+        return ngx_conf_set_str_slot(cf, cmd, conf);
     }
-    return ngx_conf_set_str_slot(cf, cmd, conf);
+    
+    return "No application linking in server block";
 } /* ngx_http_link_func_init_method */
 
 static ngx_int_t
@@ -1156,6 +1152,9 @@ static char*
 ngx_http_link_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     ngx_http_link_func_loc_conf_t *prev = parent;
     ngx_http_link_func_loc_conf_t *conf = child;
+    ngx_http_link_func_srv_conf_t *scf;
+
+    scf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_link_func_module);
 
     ngx_conf_merge_ptr_value(conf->ext_req_headers, prev->ext_req_headers, NULL);
 #if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
@@ -1163,6 +1162,14 @@ ngx_http_link_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
 #endif
     ngx_conf_merge_str_value(conf->_method_name, prev->_method_name, "");
 
+    if (conf->_method_name.len != 0) {
+        if (scf && scf->_libname.len > 0) {
+            ngx_http_link_func_loc_q_t *loc_q = ngx_pcalloc(cf->pool, sizeof(ngx_http_link_func_loc_q_t));
+            loc_q->_loc_conf = conf;
+            ngx_queue_init(&loc_q->_queue);
+            ngx_queue_insert_tail(scf->_link_func_locs_queue, &loc_q->_queue);
+        }
+    }
     // if (conf->_method_name.len == 0) {
     //     conf->_method_name = prev->_method_name;
     // }

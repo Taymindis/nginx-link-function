@@ -305,7 +305,7 @@ static ngx_command_t ngx_http_link_func_commands[] = {
         offsetof(ngx_http_link_func_loc_conf_t, _method_name), /* No offset when storing the module configuration on struct. */
         NULL
     },
-    {   ngx_string("ngx_link_func_add_prop"), 
+    {   ngx_string("ngx_link_func_add_prop"),
         NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_CONF_TAKE2,
         ngx_conf_set_keyval_slot,
         NGX_HTTP_SRV_CONF_OFFSET,
@@ -630,7 +630,7 @@ ngx_http_link_func_init_method(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     if (scf && scf->_libname.len > 0) {
         return ngx_conf_set_str_slot(cf, cmd, conf);
     }
-    
+
     return "No application linking in server block";
 } /* ngx_http_link_func_init_method */
 
@@ -653,7 +653,7 @@ ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_sr
         appcyc.__log__ = cycle->log;
         appcyc.shared_mem = (void*)mcf->shm_ctx->shared_mem;
         func(&appcyc);
-        if(appcyc.has_error) {
+        if (appcyc.has_error) {
             ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "%s", "link function worker Initialize unsuccessfully");
             return NGX_ERROR;
         }
@@ -673,11 +673,11 @@ ngx_http_link_func_post_configuration(ngx_conf_t *cf) {
 
         cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 
-        if( cmcf == NULL ) {
+        if ( cmcf == NULL ) {
             return NGX_ERROR;
         }
 
-        if( ngx_http_link_func_application_compatibility_check(cf, cmcf) == NGX_ERROR ) {
+        if ( ngx_http_link_func_application_compatibility_check(cf, cmcf) == NGX_ERROR ) {
             return NGX_ERROR;
         }
 
@@ -811,16 +811,16 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
             ngx_http_link_func_app_cycle_handler func;
             *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_init_cycle");
             if ((error = dlerror()) != NULL) {
-                ngx_conf_log_error(NGX_LOG_ERR, cf, 0, 
-                    "function ngx_link_func_init_cycle(ngx_link_func_cycle_t *cycle) not found in \"%V\", at least create an empty init function block \n %s", 
-                    &scf->_libname, error);
+                ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
+                                   "function ngx_link_func_init_cycle(ngx_link_func_cycle_t *cycle) not found in \"%V\", at least create an empty init function block \n %s",
+                                   &scf->_libname, error);
                 return NGX_ERROR;
             }
             *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit_cycle");
             if ((error = dlerror()) != NULL) {
-                ngx_conf_log_error(NGX_LOG_ERR, cf, 0, 
-                    "function ngx_link_func_exit_cycle(ngx_link_func_cycle_t *cycle) not found in \"%V\", at least create an empty exit function block \n %s", 
-                    &scf->_libname, error);
+                ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
+                                   "function ngx_link_func_exit_cycle(ngx_link_func_cycle_t *cycle) not found in \"%V\", at least create an empty exit function block \n %s",
+                                   &scf->_libname, error);
             }
 
 
@@ -932,7 +932,7 @@ ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
                 //     return NGX_ERROR;
                 // }
                 ngx_queue_remove(q);
-            }            
+            }
         } else {
             continue;
         }
@@ -1013,7 +1013,7 @@ ngx_http_link_func_process_exit(ngx_cycle_t *cycle) {
                 appcyc.__log__ = cycle->log;
                 appcyc.shared_mem = (void*)mcf->shm_ctx->shared_mem;
                 func(&appcyc);
-                if(appcyc.has_error) {
+                if (appcyc.has_error) {
                     ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "%s", "link function worker exit error");
                 }
             }
@@ -1872,12 +1872,12 @@ ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen)
 
     scf = ngx_http_get_module_srv_conf(r, ngx_http_link_func_module);
 
-    if( scf == NULL ) {
+    if ( scf == NULL ) {
         ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "Invalid link function server config");
         return NULL;
     }
 
-    if(scf->_props == NULL) {
+    if (scf->_props == NULL) {
         return NULL;
     }
 
@@ -1885,11 +1885,11 @@ ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen)
     keyval = scf->_props->elts;
 
     for (i = 0; i < nelts; i++) {
-      if ( keyval->key.len == keylen && ngx_strncasecmp(keyval->key.data, (u_char*) key, keylen) == 0) {
-        /** it is config memory pool, should not reallocate or overwrite **/
-        return keyval->value.data;          
-      }
-      keyval++;
+        if ( keyval->key.len == keylen && ngx_strncasecmp(keyval->key.data, (u_char*) key, keylen) == 0) {
+            /** it is config memory pool, should not reallocate or overwrite **/
+            return keyval->value.data;
+        }
+        keyval++;
     }
     return NULL;
 }
@@ -1906,14 +1906,14 @@ ngx_link_func_cyc_get_prop(ngx_link_func_cycle_t *cyc, const char *key, size_t k
     }
 
     log = (ngx_log_t*) cyc->__log__;
-    scf =(ngx_http_link_func_srv_conf_t*) cyc->__srv_cf__;
+    scf = (ngx_http_link_func_srv_conf_t*) cyc->__srv_cf__;
 
-    if( scf == NULL || log == NULL) {
+    if ( scf == NULL || log == NULL) {
         ngx_log_error(NGX_LOG_EMERG, log, 0, "Invalid link function server config");
         return NULL;
     }
 
-    if(scf->_props == NULL) {
+    if (scf->_props == NULL) {
         return NULL;
     }
 
@@ -1921,11 +1921,11 @@ ngx_link_func_cyc_get_prop(ngx_link_func_cycle_t *cyc, const char *key, size_t k
     keyval = scf->_props->elts;
 
     for (i = 0; i < nelts; i++) {
-      if ( keyval->key.len == keylen && ngx_strncasecmp(keyval->key.data, (u_char*) key, keylen) == 0) {
-        /** it is config memory pool, should not reallocate or overwrite **/
-        return keyval->value.data;          
-      }
-      keyval++;
+        if ( keyval->key.len == keylen && ngx_strncasecmp(keyval->key.data, (u_char*) key, keylen) == 0) {
+            /** it is config memory pool, should not reallocate or overwrite **/
+            return keyval->value.data;
+        }
+        keyval++;
     }
     return NULL;
 }
@@ -2327,7 +2327,7 @@ ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_
     if ( connect(*sockfd, (struct sockaddr *) &dest_addr,
                  sizeof(struct sockaddr)) == -1 ) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Unable connect to host %s - %s on port %d.\n",
-                      hostname, inet_ntoa(dest_addr.sin_addr), port);
+                           hostname, inet_ntoa(dest_addr.sin_addr), port);
         rc = 0;
     }
     rc = 1;
@@ -2498,7 +2498,7 @@ ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_s
     if ( connect(*sockfd, (struct sockaddr *) &dest_addr,
                  sizeof(struct sockaddr)) == -1 ) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Unable connect to host %s - %s on port %d.\n",
-                      hostname, inet_ntoa(dest_addr.sin_addr), port);
+                           hostname, inet_ntoa(dest_addr.sin_addr), port);
         rc = 0;
         goto DONE;
     }

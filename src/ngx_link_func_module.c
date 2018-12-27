@@ -796,13 +796,16 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
                 }
             }
 
+            char *error;
             scf->_app = dlopen((char*) scf->_libname.data, RTLD_LAZY | RTLD_NOW);
             if ( !scf->_app )  {
-                ngx_conf_log_error(NGX_LOG_ERR, cf,  0, "%s", "unable to initialized the Application ");
+                if ((error = dlerror()) != NULL) {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "unable to initialized the Application %s", error);
+                } else {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "unable to initialized the Application unknown issue");
+                }
                 return NGX_ERROR;
             }
-
-            char *error;
 
             /* * check init function block, this version has to be at least init with empty function * */
             ngx_http_link_func_app_cycle_handler func;
@@ -878,15 +881,19 @@ ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
         if (scf && scf->_libname.len > 0 ) {
             ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "Loading application= %V", &scf->_libname);
 
+            char *error;
             scf->_app = dlopen((char*) scf->_libname.data, RTLD_LAZY | RTLD_NOW);
             if ( !scf->_app )  {
-                ngx_log_error(NGX_LOG_ERR, cycle->log,  0, "%s", "unable to initialized the Application ");
+                if ((error = dlerror()) != NULL) {
+                    ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "unable to initialized the Application %s", error);
+                } else {
+                    ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "%s", "unable to initialized the Application, unknown issue");
+                }
                 return NGX_ERROR;
             } else {
                 ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Application %V loaded successfully ", &scf->_libname);
             }
 
-            char *error;
             /*** loop and without remove queue***/
             ngx_queue_t* q;
             for (q = ngx_queue_head(scf->_link_func_locs_queue);

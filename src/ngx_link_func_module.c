@@ -2605,7 +2605,7 @@ ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_conf_t *cf) {
         }
     }
 done:
-    hhb = convert_to_http_header_body(final_buf, curr_size, cycle);
+    hhb = convert_to_http_header_body(final_buf, curr_size, cf);
     ngx_pfree(cf->pool, final_buf);
     return hhb;
 }
@@ -2616,10 +2616,10 @@ ngx_http_link_func_https_request(ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* 
     ngx_http_link_func_http_header_body* hhb = NULL;
     SSL_CTX *ctx = NULL;
     SSL *ssl = NULL;
-    if (ngx_http_link_func_connect_and_request_via_ssl(&sockfd, scf, &ctx, &ssl, cycle)) {
-        hhb = ngx_http_link_func_read_data_from_server_via_ssl(ssl, cycle);
+    if (ngx_http_link_func_connect_and_request_via_ssl(&sockfd, scf, &ctx, &ssl, cf)) {
+        hhb = ngx_http_link_func_read_data_from_server_via_ssl(ssl, cf);
         if (hhb) {
-            ngx_http_link_func_write_to_file((char*)scf->_libname.data, hhb->body_content, hhb->body_len, cycle);
+            ngx_http_link_func_write_to_file((char*)scf->_libname.data, hhb->body_content, hhb->body_len, cf);
             ngx_pfree(cf->pool, hhb->header_content);
             ngx_pfree(cf->pool, hhb->body_content);
             ngx_pfree(cf->pool, hhb);

@@ -248,7 +248,9 @@ extern void ngx_link_func_write_resp(
 Sample Application Development
 ===============================
 
-Feel free to clone a sample project on [Sample Project](https://github.com/Taymindis/sample-ngx-cfunc-project)
+Feel free to clone a sample project on 
+[Simple Project with cmake](https://github.com/Taymindis/simple_linkfunc_app)
+[With google direction Project with cmake](https://github.com/Taymindis/sample-ngx-cfunc-project)
 
 ```c
 #include <stdio.h>

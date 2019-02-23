@@ -266,8 +266,6 @@ void ngx_link_func_init_cycle(ngx_link_func_cycle_t* cycle) {
     is_service_on=1;
 }
 
-
-
 void my_app_simple_get_greeting(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get");
 
@@ -276,33 +274,47 @@ void my_app_simple_get_greeting(ngx_link_func_ctx_t *ctx) {
         200,
         "200 OK",
         "text/plain",
-        "greeting from ngx_link_func testing"
+        "greeting from ngx_link_func testing",
+        sizeof("greeting from ngx_link_func testing")-1
     );
 }
 
 void my_app_simple_get_args(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get_args");
 
-    ngx_link_func_write_resp(
-        ctx,
-        200,
-        "200 OK",
-        "text/plain",
-        ctx->req_args
-    );
+    if(ctx->req_args) {
+        ngx_link_func_write_resp(
+            ctx,
+            200,
+            "200 OK",
+            "text/plain",
+            ctx->req_args,
+            strlen(ctx->req_args)
+        );
+    } else {
+        ngx_link_func_write_resp(
+            ctx,
+            204,
+            "",
+            "text/plain",
+            NULL,
+            0
+        );
+    }
 }
 
 void my_app_simple_get_token_args(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get_token_args");
 
-    char * tokenArgs = ngx_link_func_get_query_param(ctx, "token");
+    char * tokenArgs = (char*)ngx_link_func_get_query_param(ctx, "token");
     if (! tokenArgs) {
         ngx_link_func_write_resp(
             ctx,
             401,
             "401 unauthorized",
             "text/plain",
-            "Token Not Found"
+            "Token Not Found",
+            sizeof("Token Not Found")-1
         );
     } else {
         ngx_link_func_write_resp(
@@ -310,7 +322,8 @@ void my_app_simple_get_token_args(ngx_link_func_ctx_t *ctx) {
             401,
             "401 unauthorized",
             "text/plain",
-            tokenArgs
+            tokenArgs,
+            strlen(tokenArgs)
         );
     }
 }
@@ -323,8 +336,8 @@ void my_app_simple_post(ngx_link_func_ctx_t *ctx) {
         202,
         "202 Accepted and Processing",
         "text/plain",
-        ctx->req_body,
-        ctx->req_body
+        NULL,
+        0
     );
 }
 
@@ -333,7 +346,7 @@ void my_app_simple_post(ngx_link_func_ctx_t *ctx) {
 void my_app_simple_get_no_resp(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get_no_resp");
 
-
+    //  return 404 
 }
 
 void ngx_link_func_exit_cycle(ngx_link_func_cycle_t* cyc) {

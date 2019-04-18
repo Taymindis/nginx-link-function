@@ -426,7 +426,7 @@ Check out [wiki](https://github.com/Taymindis/nginx-link-function/wiki) for more
 Copyright & License
 ===================
 
-Copyright (c) 2018, Taymindis <cloudleware2015@gmail.com>
+Copyright (c) 2019, Taymindis <cloudleware2015@gmail.com>
 
 This module is licensed under the terms of the BSD license.
 

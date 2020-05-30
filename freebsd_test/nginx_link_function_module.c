@@ -641,7 +641,7 @@ ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_sr
     ngx_http_link_func_app_cycle_handler func;
 
 #if __FreeBSD__
-    dlerror();
+   (void) dlerror();
 #endif
 
     *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_init_cycle");
@@ -911,7 +911,7 @@ ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
                     if ( ( lcf->_handler = ngx_http_link_func_get_duplicate_handler(scf, &lcf->_method_name) ) == NULL ) {
 
 #if __FreeBSD__
-     dlerror();
+   (void) dlerror();
 #endif
     
                         *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
@@ -1013,7 +1013,7 @@ ngx_http_link_func_process_exit(ngx_cycle_t *cycle) {
             ngx_http_link_func_app_cycle_handler func;
 
 #if __FreeBSD__
-    dlerror();
+   (void) dlerror();
 #endif
 
             *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit_cycle");

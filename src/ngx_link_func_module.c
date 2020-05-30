@@ -639,6 +639,11 @@ ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_sr
     /**** Init the client apps ngx_http_link_func_init ***/
     char *error;
     ngx_http_link_func_app_cycle_handler func;
+
+#if __FreeBSD__
+   (void) dlerror();
+#endif
+
     *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_init_cycle");
     if ((error = dlerror()) != NULL) {
         ngx_log_error(NGX_LOG_WARN, cycle->log, 0, "Unable to init call %s , skipped init called", error);
@@ -904,6 +909,11 @@ ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
                 ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
                 if ( lcf && lcf->_method_name.len > 0 )  {
                     if ( ( lcf->_handler = ngx_http_link_func_get_duplicate_handler(scf, &lcf->_method_name) ) == NULL ) {
+
+#if __FreeBSD__
+   (void) dlerror();
+#endif
+    
                         *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
                         if ((error = dlerror()) != NULL) {
                             ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Error function load: %s", error);
@@ -1001,6 +1011,11 @@ ngx_http_link_func_process_exit(ngx_cycle_t *cycle) {
         if (scf && scf->_app ) {
             /*** Exiting the client apps ***/
             ngx_http_link_func_app_cycle_handler func;
+
+#if __FreeBSD__
+   (void) dlerror();
+#endif
+
             *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit_cycle");
             if ((error = dlerror()) != NULL) {
                 ngx_log_error(NGX_LOG_WARN, cycle->log, 0, "Unable to exit call %s , skipped exit called", error);
@@ -2637,4 +2652,3 @@ ngx_http_link_func_https_request(ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* 
 #endif
 
 /*** End Download Feature Support ***/
-

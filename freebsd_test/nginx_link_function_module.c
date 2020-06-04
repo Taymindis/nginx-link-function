@@ -812,6 +812,9 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
                 return NGX_ERROR;
             }
 
+#if __FreeBSD__
+   (void) dlerror();
+#endif
             /* * check init function block, this version has to be at least init with empty function * */
             ngx_http_link_func_app_cycle_handler func;
             *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_init_cycle");
@@ -821,6 +824,11 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
                                    &scf->_libname, error);
                 return NGX_ERROR;
             }
+
+#if __FreeBSD__
+   (void) dlerror();
+#endif
+
             *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit_cycle");
             if ((error = dlerror()) != NULL) {
                 ngx_conf_log_error(NGX_LOG_ERR, cf, 0,
@@ -838,6 +846,11 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
 
                 ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
                 if ( lcf && lcf->_method_name.len > 0 )  {
+                    
+#if __FreeBSD__
+   (void) dlerror();
+#endif
+
                     *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
                     if ((error = dlerror()) != NULL) {
                         ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Error function load: %s", error);

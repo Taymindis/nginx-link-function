@@ -54,6 +54,7 @@ typedef unsigned char u_char;
 #endif
 
 typedef struct {
+    char *uri;
     char *req_args; // Uri Args
     u_char *req_body; // Request Body
     size_t req_body_len; // length of body

@@ -1477,6 +1477,17 @@ new_task:
     /***Set to NGX_HTTP_NOT_FOUND incase function handler or it has subrequest does not return anything ***/
     internal_ctx->rc = NGX_HTTP_NOT_FOUND;
 
+    if (r->uri.len > 0) {
+        new_ctx->uri = ngx_pcalloc(r->pool, r->uri.len + 1);
+        if (new_ctx->uri == NULL) {
+            ngx_log_error(NGX_LOG_EMERG, r->connection->log, 0, "insufficient memory....");
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+        ngx_memcpy(new_ctx->uri, (char *)r->uri.data, r->uri.len);
+    } else {
+        new_ctx->uri = NULL;
+    }
+
     if (r->args.len > 0) {
         new_ctx->req_args = ngx_pcalloc(r->pool, r->args.len + 1);
         if (new_ctx->req_args == NULL) {

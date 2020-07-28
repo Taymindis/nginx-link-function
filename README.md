@@ -1,3 +1,7 @@
+
+nginx-link-function is being sponsored by the following tool; please help to support us by taking a look and signing up to a free trial
+<a href="https://tracking.gitads.io/?repo=nginx-link-function"> <img src="https://images.gitads.io/nginx-link-function" alt="GitAds"/> </a>
+
 <p align="center"><img src="nginx-link-function-logo.png" alt="nginx link function Logo" /></p>
 <h1 align="center">nginx-link-function</h1>
 <h3 align="center">The Application dynamic linking with Nginx </h3>

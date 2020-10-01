@@ -253,7 +253,9 @@ Feel free to clone a sample project at
  
 [Simple Project with cmake](https://github.com/Taymindis/simple_linkfunc_app)
 
-[With google direction Project with cmake](https://github.com/Taymindis/sample-ngx-cfunc-project)
+[link function google direction](https://github.com/Taymindis/sample-ngx-linkfunc-project/tree/master/ngx-cfunc-ggl-direction)
+[linkfunc-jwt-auth](https://github.com/Taymindis/sample-ngx-linkfunc-project/tree/master/linkfunc-jwt-auth)
+
 
 ```c
 #include <stdio.h>

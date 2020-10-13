@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ngx_link_func_module_version_33 33
+#define ngx_link_func_module_version_34 34
 
 
 #define ngx_link_func_content_type_plaintext "text/plain"
@@ -52,6 +52,11 @@
 #ifndef u_char
 typedef unsigned char u_char;
 #endif
+
+typedef struct {
+    size_t len;
+    u_char *data;
+} ngx_link_func_str_t;
 
 typedef struct {
     char *req_args; // Uri Args
@@ -92,6 +97,12 @@ extern void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);
 extern void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
 extern void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
 
+/**
+ *  example: ngx_link_func_str_t uri;
+ *   if(ngx_link_func_get_uri(ctx, &uri) == 0) {  TODO success }
+ *  
+ */
+extern int ngx_link_func_get_uri(ngx_link_func_ctx_t *ctx, ngx_link_func_str_t *str);
 extern u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 extern u_char* ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 extern void* ngx_link_func_get_query_param(ngx_link_func_ctx_t *ctx, const char *key);

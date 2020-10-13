@@ -24,11 +24,11 @@ ngx_feature_incs="#include <ngx_link_func_module.h>"
 ngx_feature_path=
 ngx_feature_libs=
 # ngx_feature_exit_if_not_found=yes
-ngx_feature_test="int ngx_link_func_module_current_version_=ngx_link_func_module_version_33;"
+ngx_feature_test="int ngx_link_func_module_current_version_=ngx_link_func_module_version_34;"
 . auto/feature
 
 if [ $ngx_found != yes ]; then
-echo "ngx_link_func_module.h not found in your system c header path, please copy latest ngx_link_func_module.h to your /usr/include or /usr/local/include or relavent header search path with read and write permission given."
+echo "ngx_link_func_module.h not found or version not aligned in your system c header path, please copy latest ngx_link_func_module.h to your /usr/include or /usr/local/include or relavent header search path with read and write permission given."
 echo "e.g install -m 644 ../nginx-link-function/src/ngx_link_func_module.h /usr/local/include/"
 echo
 exit 1

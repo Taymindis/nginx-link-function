@@ -40,7 +40,7 @@ void my_app_simple_get_delay_greeting(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get");
 
     char *rep = "2 second delay greeting from ngx_link_func testing";
-    sleep(2); 
+    sleep(2);
     ngx_link_func_write_resp(
         ctx,
         200,
@@ -51,10 +51,34 @@ void my_app_simple_get_delay_greeting(ngx_link_func_ctx_t *ctx) {
     );
 }
 
+void my_app_simple_get_uri(ngx_link_func_ctx_t *ctx) {
+    ngx_link_func_log_info(ctx, "log from my_app_simple_get_uri");
+    ngx_link_func_str_t uri;
+    if (ngx_link_func_get_uri(ctx, &uri) == 0) {
+        ngx_link_func_write_resp(
+            ctx,
+            200,
+            "200 OK",
+            "text/plain",
+            uri.data,
+            uri.len
+        );
+    } else {
+        ngx_link_func_write_resp(
+            ctx,
+            404,
+            "404 NOT FOUND",
+            "text/plain",
+            NULL,
+            0
+        );
+    }
+}
+
 void my_app_simple_get_prop_greeting(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get");
     u_char *defaultGreeting =  ngx_link_func_get_prop(ctx, "defaultGreeting", sizeof("defaultGreeting") - 1);
-    if(defaultGreeting) {
+    if (defaultGreeting) {
         ngx_link_func_write_resp(
             ctx,
             200,
@@ -147,7 +171,7 @@ AUTH_FAILED:
         userName = login(userId, userPass);
         /** Add input header for downstream response **/
         if (userName) {
-            ngx_link_func_add_header_in(ctx, "userName", sizeof("userName")-1, userName, strlen(userName));
+            ngx_link_func_add_header_in(ctx, "userName", sizeof("userName") - 1, userName, strlen(userName));
         } else {
             goto AUTH_FAILED;
         }
@@ -158,7 +182,7 @@ AUTH_FAILED:
             "200 OK",
             "text/plain",
             "OK",
-            sizeof("OK")-1
+            sizeof("OK") - 1
         );
     }
 }

@@ -745,7 +745,7 @@ ngx_http_link_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_ERROR;
 #endif
 
-#ifndef ngx_link_func_module_version_33
+#ifndef ngx_link_func_module_version_34
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the ngx_http_link_func_module.h might not be latest or not found in the c header path, \
         please copy latest ngx_http_link_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");

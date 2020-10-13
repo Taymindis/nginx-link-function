@@ -216,6 +216,7 @@ void ngx_link_func_log_info(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
 char *ngx_link_func_strdup(ngx_link_func_ctx_t *ctx, const char *src);
+int ngx_link_func_get_uri(ngx_link_func_ctx_t *ctx, ngx_link_func_str_t *str);
 u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 u_char* ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 int ngx_link_func_add_header_in(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len );
@@ -641,7 +642,7 @@ ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_sr
     ngx_http_link_func_app_cycle_handler func;
 
 #if __FreeBSD__
-   (void) dlerror();
+    (void) dlerror();
 #endif
 
     *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_init_cycle");
@@ -745,7 +746,7 @@ ngx_http_link_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_ERROR;
 #endif
 
-#ifndef ngx_link_func_module_version_33
+#ifndef ngx_link_func_module_version_34
     ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "the ngx_http_link_func_module.h might not be latest or not found in the c header path, \
         please copy latest ngx_http_link_func_module.h to your /usr/include or /usr/local/include or relavent header search path \
         with read and write permission.");
@@ -813,7 +814,7 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
             }
 
 #if __FreeBSD__
-   (void) dlerror();
+            (void) dlerror();
 #endif
             /* * check init function block, this version has to be at least init with empty function * */
             ngx_http_link_func_app_cycle_handler func;
@@ -826,7 +827,7 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
             }
 
 #if __FreeBSD__
-   (void) dlerror();
+            (void) dlerror();
 #endif
 
             *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit_cycle");
@@ -846,9 +847,9 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
 
                 ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
                 if ( lcf && lcf->_method_name.len > 0 )  {
-                    
+
 #if __FreeBSD__
-   (void) dlerror();
+                    (void) dlerror();
 #endif
 
                     *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
@@ -924,9 +925,9 @@ ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
                     if ( ( lcf->_handler = ngx_http_link_func_get_duplicate_handler(scf, &lcf->_method_name) ) == NULL ) {
 
 #if __FreeBSD__
-   (void) dlerror();
+                        (void) dlerror();
 #endif
-    
+
                         *(void**)(&lcf->_handler) = dlsym(scf->_app, (const char*)lcf->_method_name.data);
                         if ((error = dlerror()) != NULL) {
                             ngx_log_error(NGX_LOG_EMERG, cycle->log,  0, "Error function load: %s", error);
@@ -1026,7 +1027,7 @@ ngx_http_link_func_process_exit(ngx_cycle_t *cycle) {
             ngx_http_link_func_app_cycle_handler func;
 
 #if __FreeBSD__
-   (void) dlerror();
+            (void) dlerror();
 #endif
 
             *(void**)(&func) = dlsym(scf->_app, (const char*)"ngx_link_func_exit_cycle");
@@ -1846,6 +1847,18 @@ ngx_link_func_strdup(ngx_link_func_ctx_t *ctx, const char *src) {
     ngx_memcpy(dst, src, len);
     dst[len] = '\0';
     return dst;
+}
+
+int
+ngx_link_func_get_uri(ngx_link_func_ctx_t *ctx, ngx_link_func_str_t *str) {
+    ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
+    size_t len = r->uri.len;
+    if (len > 0) {
+        str->len = len;
+        str->data = r->uri.data;
+        return 0; // NGX_OK
+    } 
+    return -1; // NGX_ERROR
 }
 
 static u_char*

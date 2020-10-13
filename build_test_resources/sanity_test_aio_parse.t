@@ -150,3 +150,19 @@ GET /ext_header_foo
 foo: foovalue
 
 
+=== TEST 60: aio threads Get Uri correct
+--- main_config eval: $::main_conf
+--- config
+aio threads=my_thread_pool;
+ngx_link_func_lib "NGINX_HTTP_LINK_FUNC_TEST_LIB_PATH";
+location = /testLinkFunUri {
+    ngx_link_func_call "my_app_simple_get_uri";
+}
+--- request
+GET /testLinkFunUri
+--- error_code: 200
+--- response_headers
+Content-Type: text/plain
+--- response_body_like eval
+qr/testLinkFunUri$/
+

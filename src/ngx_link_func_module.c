@@ -217,6 +217,7 @@ void ngx_link_func_log_warn(ngx_link_func_ctx_t *ctx, const char* msg);
 void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
 char *ngx_link_func_strdup(ngx_link_func_ctx_t *ctx, const char *src);
 int ngx_link_func_get_uri(ngx_link_func_ctx_t *ctx, ngx_link_func_str_t *str);
+u_char* ngx_link_func_get_real_remote_addr(ngx_link_func_ctx_t *ctx);
 u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 u_char* ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 int ngx_link_func_add_header_in(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len );
@@ -1860,6 +1861,11 @@ ngx_link_func_get_uri(ngx_link_func_ctx_t *ctx, ngx_link_func_str_t *str) {
         return 0; // NGX_OK
     } 
     return -1; // NGX_ERROR
+}
+
+u_char* ngx_link_func_get_remote_addr(ngx_link_func_ctx_t *ctx){
+    ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
+    return r->connection->addr_text.data;
 }
 
 static u_char*

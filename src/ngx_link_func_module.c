@@ -1631,6 +1631,7 @@ ngx_http_link_func_content_handler(ngx_http_request_t *r) {
     }
 
     /* Set the Content-Type header. */
+    r->headers_out.content_type_len = resp_content_type->len;
     r->headers_out.content_type.len = resp_content_type->len;
     r->headers_out.content_type.data = resp_content_type->data;
 

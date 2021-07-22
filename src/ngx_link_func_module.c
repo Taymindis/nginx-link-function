@@ -191,16 +191,16 @@ typedef struct {
     size_t body_len;
 } ngx_http_link_func_http_header_body;
 
-static int ngx_http_link_func_write_to_file(char* out_path, char* out_buff, size_t size, ngx_conf_t *cf);
+//static int ngx_http_link_func_write_to_file(char* out_path, char* out_buff, size_t size, ngx_conf_t *cf);
 static int strpos(const char *haystack, const char *needle);
-static ngx_http_link_func_http_header_body* convert_to_http_header_body(char* final_buf, int curr_size, ngx_conf_t *cf);
-static int ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_t* scf, ngx_conf_t *cf);
-static ngx_http_link_func_http_header_body* ngx_http_link_func_read_data_from_server(int *sockfd, ngx_conf_t *cf);
-static ngx_http_link_func_http_header_body* ngx_http_link_func_http_request( ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf);
+//static ngx_http_link_func_http_header_body* convert_to_http_header_body(char* final_buf, int curr_size, ngx_conf_t *cf);
+//static int ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_t* scf, ngx_conf_t *cf);
+//static ngx_http_link_func_http_header_body* ngx_http_link_func_read_data_from_server(int *sockfd, ngx_conf_t *cf);
+//static ngx_http_link_func_http_header_body* ngx_http_link_func_http_request( ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf);
 #if (NGX_SSL || NGX_OPENSSL)
-static int ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_srv_conf_t* scf, SSL_CTX **ctx, SSL **ssl, ngx_conf_t *cf);
-static ngx_http_link_func_http_header_body* ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_conf_t *cf);
-static ngx_http_link_func_http_header_body* ngx_http_link_func_https_request( ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf);
+//static int ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_srv_conf_t* scf, SSL_CTX **ctx, SSL **ssl, ngx_conf_t *cf);
+//static ngx_http_link_func_http_header_body* ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_conf_t *cf);
+//static ngx_http_link_func_http_header_body* ngx_http_link_func_https_request( ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf);
 #endif
 /*** End Download Feature Support ***/
 
@@ -348,6 +348,42 @@ ngx_module_t ngx_http_link_func_module = {
     NGX_MODULE_V1_PADDING
 };
 
+static char *
+ngx_http_link_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+    ngx_http_link_func_loc_conf_t        *lcf = conf;
+    ngx_str_t                         *value;
+    ngx_http_link_func_req_header_t      *hdr;
+    ngx_http_compile_complex_value_t   ccv;
+
+    value = cf->args->elts;
+
+    if (lcf->ext_req_headers == NULL || lcf->ext_req_headers == NGX_CONF_UNSET_PTR) {
+        lcf->ext_req_headers = ngx_array_create(cf->pool, 2,
+                                                sizeof(ngx_http_link_func_req_header_t));
+        if (lcf->ext_req_headers == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    hdr = ngx_array_push(lcf->ext_req_headers);
+    if (hdr == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    hdr->key = value[1];
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = &value[2];
+    ccv.complex_value = &hdr->value;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+    return NGX_CONF_OK;
+}
+
 ngx_int_t
 ngx_http_link_func_shm_cache_init(ngx_shm_zone_t *shm_zone, void *data)
 {
@@ -484,133 +520,6 @@ ngx_http_link_func_validation_check_and_set_str_slot(ngx_conf_t *cf, ngx_command
     return NGX_CONF_OK;
 }
 
-// static char *ngx_http_link_func_srv_post_conf_handler(ngx_conf_t *cf, void *data, void *conf) {
-//     ngx_str_t *value = conf;
-//     ngx_http_link_func_srv_conf_t *scf  = ngx_http_conf_get_module_srv_conf(cf, ngx_http_link_func_module);
-
-//     if (value->len > 0) {
-//         scf->_app = dlopen((char*) value->data, RTLD_LAZY | RTLD_NOW);
-//         if ( !scf->_app )  {
-//             ngx_conf_log_error(NGX_LOG_ERR, cf,  0, "%s", "unable to initialized the library ");
-//             return NGX_CONF_ERROR;
-//         } else {
-//             ngx_conf_log_error(NGX_LOG_INFO, cf, 0, "Apps %V loaded successfully ", value);
-//         }
-//     }
-
-//     return NGX_CONF_OK;
-// } /* ngx_http_link_func_srv_post_conf_handler */
-
-static char *
-ngx_http_link_func_ext_req_headers_add_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-    ngx_http_link_func_loc_conf_t        *lcf = conf;
-    ngx_str_t                         *value;
-    ngx_http_link_func_req_header_t      *hdr;
-    ngx_http_compile_complex_value_t   ccv;
-
-    value = cf->args->elts;
-
-    if (lcf->ext_req_headers == NULL || lcf->ext_req_headers == NGX_CONF_UNSET_PTR) {
-        lcf->ext_req_headers = ngx_array_create(cf->pool, 2,
-                                                sizeof(ngx_http_link_func_req_header_t));
-        if (lcf->ext_req_headers == NULL) {
-            return NGX_CONF_ERROR;
-        }
-    }
-
-    hdr = ngx_array_push(lcf->ext_req_headers);
-    if (hdr == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    hdr->key = value[1];
-
-    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
-
-    ccv.cf = cf;
-    ccv.value = &value[2];
-    ccv.complex_value = &hdr->value;
-
-    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
-        return NGX_CONF_ERROR;
-    }
-    return NGX_CONF_OK;
-}
-
-#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
-
-static char *
-ngx_http_link_func_subrequest_cmd(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-    ngx_http_link_func_loc_conf_t        *lcf = conf;
-    ngx_str_t                            *values;
-    ngx_http_link_func_subreq_conf_t     *subreq;
-    ngx_uint_t                           i, j;
-    ngx_conf_enum_t                      *e;
-
-    values = cf->args->elts;
-
-    if (lcf->subrequests == NULL || lcf->subrequests == NGX_CONF_UNSET_PTR) {
-        lcf->subrequests = ngx_array_create(cf->pool, 2, sizeof(ngx_http_link_func_subreq_conf_t));
-        if (lcf->subrequests == NULL) {
-            return NGX_CONF_ERROR;
-        }
-    }
-
-    subreq = ngx_array_push(lcf->subrequests);
-    if (subreq == NULL) {
-        return NGX_CONF_ERROR;
-    }
-    ngx_memzero(subreq, sizeof(ngx_http_link_func_subreq_conf_t));
-
-    for (i = 1; i < cf->args->nelts; i++) {
-        if (i == 1) {
-            subreq->uri = values[i];
-        } else {
-            e = ngx_http_link_func_subrequest_flags;
-            for (j = 0; e[j].name.len != 0; j++) {
-                if (e[j].name.len == values[i].len
-                        && ngx_strcasecmp(e[j].name.data, values[i].data) == 0) {
-                    // subreq->flag = e[j].value;
-// #if(NGX_THREADS)
-//                     if (subreq->flag == NGX_SUBREQ_PARALLEL) {
-//                         return "parallel request is not applicable in aio threads yet.";
-//                     }
-// #endif
-                    switch (e[j].value) {
-                    case NGX_SUBREQ_CHECK_STATUS:
-                        subreq->check_status = 1;
-                        break;
-                    case NGX_SUBREQ_INCL_ARGS:
-                        subreq->incl_args = 1;
-                        break;
-                    case NGX_SUBREQ_INCL_BODY:
-                        subreq->incl_body = 1;
-                        break;
-                    default:
-                        return "invalid subrequest flag given, either incl_args, incl_body or check_status.";
-                    }
-                    break;
-                }
-            }
-
-            if (e[j].name.len == 0) {
-                return "invalid subrequest flag given, either incl_args, incl_body or check_status.";
-            }
-
-        } /*else if (i == 3) {
-            if ( (sizeof("on") - 1) == values[i].len && ngx_strcasecmp((u_char*)"on", values[i].data) == 0) {
-                subreq->incl_args = 1;
-            }
-        } else if (i == 4) {
-            if ( (sizeof("on") - 1) == values[i].len && ngx_strcasecmp((u_char*)"on", values[i].data) == 0) {
-                subreq->incl_body = 1;
-            }
-        }*/
-    }
-    return NGX_CONF_OK;
-}
-#endif
-
 /**
  * Configuration setup function that installs the content handler.
  *
@@ -668,6 +577,25 @@ ngx_http_link_func_proceed_init_calls(ngx_cycle_t* cycle,  ngx_http_link_func_sr
 
     ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "%s", "Done proceed init calls");
     return NGX_OK;
+}
+
+static void*
+ngx_http_link_func_get_duplicate_handler(ngx_http_link_func_srv_conf_t *scf, ngx_str_t *method_name) {
+    /* this is only do when init or exit application, don't be count as performance issue, this is for same method merged */
+    ngx_queue_t* q;
+    for (q = ngx_queue_head(scf->_link_func_locs_queue);
+            q != ngx_queue_sentinel(scf->_link_func_locs_queue);
+            q = ngx_queue_next(q)) {
+        ngx_http_link_func_loc_q_t* cflq = (ngx_http_link_func_loc_q_t *) q;
+        ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
+        if ( lcf && lcf->_method_name.len > 0 )  {
+            if ( lcf->_handler && lcf->_method_name.len == method_name->len &&
+                    ngx_strncmp(lcf->_method_name.data, method_name->data, method_name->len) == 0 ) {
+                return lcf->_handler;
+            }
+        }
+    }
+    return NULL;
 }
 
 static ngx_int_t
@@ -757,24 +685,6 @@ ngx_http_link_func_pre_configuration(ngx_conf_t *cf) {
     return NGX_OK;
 }
 
-static void*
-ngx_http_link_func_get_duplicate_handler(ngx_http_link_func_srv_conf_t *scf, ngx_str_t *method_name) {
-    /* this is only do when init or exit application, don't be count as performance issue, this is for same method merged */
-    ngx_queue_t* q;
-    for (q = ngx_queue_head(scf->_link_func_locs_queue);
-            q != ngx_queue_sentinel(scf->_link_func_locs_queue);
-            q = ngx_queue_next(q)) {
-        ngx_http_link_func_loc_q_t* cflq = (ngx_http_link_func_loc_q_t *) q;
-        ngx_http_link_func_loc_conf_t *lcf = cflq->_loc_conf;
-        if ( lcf && lcf->_method_name.len > 0 )  {
-            if ( lcf->_handler && lcf->_method_name.len == method_name->len &&
-                    ngx_strncmp(lcf->_method_name.data, method_name->data, method_name->len) == 0 ) {
-                return lcf->_handler;
-            }
-        }
-    }
-    return NULL;
-}
 
 static ngx_int_t
 ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core_main_conf_t  *cmcf) {
@@ -793,15 +703,15 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
         if (scf && scf->_libname.len > 0 ) {
             ngx_conf_log_error(NGX_LOG_DEBUG, cf, 0, "%s", "Loading application= %V", &scf->_libname);
 
-            if (scf->_downloadlink.len > 0 ) {
-                if (ngx_strncmp(scf->_downloadlink.data, "https://", 8) == 0) {
-#if (NGX_SSL || NGX_OPENSSL)
-                    ngx_http_link_func_https_request(cf, scf);
-#endif
-                } else if (ngx_strncmp(scf->_downloadlink.data, "http://", 7) == 0) {
-                    ngx_http_link_func_http_request( cf, scf);
-                }
-            }
+//            if (scf->_downloadlink.len > 0 ) {
+//                if (ngx_strncmp(scf->_downloadlink.data, "https://", 8) == 0) {
+//#if (NGX_SSL || NGX_OPENSSL)
+//                    ngx_http_link_func_https_request(cf, scf);
+//#endif
+//                } else if (ngx_strncmp(scf->_downloadlink.data, "http://", 7) == 0) {
+//                    ngx_http_link_func_http_request( cf, scf);
+//                }
+//            }
 
             char *error;
             scf->_app = dlopen((char*) scf->_libname.data, RTLD_LAZY | RTLD_NOW);
@@ -881,6 +791,9 @@ ngx_http_link_func_application_compatibility_check(ngx_conf_t *cf, ngx_http_core
 
 static ngx_int_t
 ngx_http_link_func_module_init(ngx_cycle_t *cycle) {
+
+    // we could load our dll directly here and avoid the other work
+
     ngx_uint_t s;
     ngx_http_link_func_srv_conf_t *scf;
     ngx_http_core_srv_conf_t **cscfp;
@@ -1061,47 +974,6 @@ ngx_http_link_func_process_exit(ngx_cycle_t *cycle) {
 
 static void
 ngx_http_link_func_master_exit(ngx_cycle_t *cycle) {
-    // Bug Fixed Migrate dlclose to process exit cycle to handling nginx reload
-    // ngx_uint_t s;
-    // ngx_http_link_func_srv_conf_t *scf;
-    // ngx_http_core_srv_conf_t **cscfp;
-    // ngx_http_core_main_conf_t *cmcf;
-    // ngx_http_link_func_main_conf_t *cfunmcf;
-    // ngx_http_conf_ctx_t *ctx = (ngx_http_conf_ctx_t *)ngx_get_conf(cycle->conf_ctx, ngx_http_module);
-
-    // cmcf = ctx->main_conf[ngx_http_core_module.ctx_index];
-    // cscfp = cmcf->servers.elts;
-
-    // for (s = 0; s < cmcf->servers.nelts; s++) {
-    //     ngx_http_core_srv_conf_t *cscf = cscfp[s];
-    //     scf = cscf->ctx->srv_conf[ngx_http_link_func_module.ctx_index];
-    //     if (scf && scf->_app ) {
-    //         if (dlclose(scf->_app) != 0) {
-    //             ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error to unload the app lib %V", &scf->_libname);
-    //         } else {
-    //             ngx_log_error(NGX_LOG_INFO, cycle->log, 0, "Unloaded app lib %V", &scf->_libname);
-    //         }
-
-    //     } else {
-    //         continue;
-    //     }
-    // }
-
-    // cfunmcf = ctx->main_conf[ngx_http_link_func_module.ctx_index];
-
-    // if (cfunmcf == NULL) {
-    //     ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "Error when master exit");
-    //     return;
-    // }
-    // End Bug Fixed Migrate dlclose to process exit cycle to handling nginx reload
-
-    // if (cfunmcf->shm_ctx && cfunmcf->shm_ctx->shared_mem) {
-    //     if (cfunmcf->shm_ctx->shared_mem->shpool && cfunmcf->shm_ctx->shared_mem->shpool->log_ctx) {
-    //         ngx_slab_free(cfunmcf->shm_ctx->shared_mem->shpool, cfunmcf->shm_ctx->shared_mem->shpool->log_ctx);
-    //     }
-    //     ngx_slab_free(cfunmcf->shm_ctx->shared_mem->shpool, cfunmcf->shm_ctx->shared_mem);
-    // }
-
     ngx_log_error(NGX_LOG_DEBUG, cycle->log, 0, "ngx-http-link-func module Exiting ");
 }
 
@@ -1244,6 +1116,7 @@ ngx_http_link_func_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
     return NGX_CONF_OK;
 }
 
+// used
 #if (NGX_THREADS) && (nginx_version > 1013003)
 static void
 ngx_http_link_func_process_t_handler(void *data, ngx_log_t *log)
@@ -1264,6 +1137,7 @@ ngx_http_link_func_process_t_handler(void *data, ngx_log_t *log)
 
 }
 
+// used
 static void
 ngx_http_link_func_after_process(ngx_event_t *ev) {
     ngx_link_func_ctx_t *app_ctx = ev->data;
@@ -1284,99 +1158,6 @@ ngx_http_link_func_after_process(ngx_event_t *ev) {
 }
 #endif
 
-#if (NGX_LINK_FUNC_SUBREQ) && (nginx_version > 1013009)
-// static ngx_int_t
-// ngx_http_link_func_subreqest_parallel_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
-//     ngx_http_link_func_internal_ctx_t   *ctx = data;
-//     ngx_uint_t                          status = r->headers_out.status;
-
-//     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-//                    "subrequest parallel done:%ui", status);
-//     if (status) {
-//         ctx->subreq_parallel_wait_cnt--;
-//     }
-//     return rc;
-// }
-static ngx_int_t
-ngx_http_link_func_subrequest_done(ngx_http_request_t *r, void *data, ngx_int_t rc) {
-    ngx_http_link_func_internal_ctx_t   *ctx = data;
-    ngx_uint_t                          status = r->headers_out.status;
-
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "subrequest sequential done:%ui", status);
-    if (status) {
-        if ( ctx->status_check ) {
-            if ( (status < 200 || status >= 300) && ctx->status_code == 0) {
-                ctx->status_code = status;
-            }
-            ctx->status_check = 0;
-        }
-        ctx->subreq_sequential_wait_cnt--;
-    }
-    return rc;
-}
-
-static ngx_int_t
-ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_subreq_conf_t *subreq, ngx_http_link_func_internal_ctx_t *ctx) {
-    ngx_http_request_t            *sr;
-    ngx_http_post_subrequest_t    *ps;
-    ngx_str_t                     *args;
-    // ngx_uint_t                    subreq_flag;
-    ngx_int_t                     rc;
-
-    if (subreq->uri.len == 0) {
-        return NGX_ERROR;
-    }
-
-    if (subreq->incl_args) {
-        args = &r->args;
-    } else {
-        args = NULL;
-    }
-
-    ps = ngx_palloc(r->pool, sizeof(ngx_http_post_subrequest_t));
-    if (ps == NULL) {
-        return NGX_ERROR;
-    }
-    ps->data = ctx;
-
-    if (subreq->check_status) {
-        ctx->status_check = 1;
-    }
-
-    ps->handler = ngx_http_link_func_subrequest_done;
-    ctx->subreq_sequential_wait_cnt++;
-    rc = NGX_DONE;
-
-    ctx->subreq_curr_index++;
-
-    if (ngx_http_subrequest(r, &subreq->uri, args, &sr, ps, NGX_HTTP_SUBREQUEST_WAITED |  NGX_HTTP_SUBREQUEST_IN_MEMORY ) == NGX_ERROR) {
-        return NGX_ERROR;
-    }
-
-    /*
-     * assign request body to avoid re read
-     */
-    if (subreq->incl_body) {
-        sr->request_body = r->request_body;
-        r->preserve_body = 1;
-
-        // header_only is already 0 when pcalloc
-        // sr->header_only = 0;
-    } else {
-        sr->request_body = ngx_pcalloc(r->pool, sizeof(ngx_http_request_body_t));
-        if (sr->request_body == NULL) {
-            return NGX_ERROR;
-        }
-        sr->header_only = 1;
-    }
-
-    sr->method = r->method;
-    sr->method_name = r->method_name;
-    // ctx->subrequest = sr;
-    return rc;
-}
-#endif
 
 /**
  * Pre Content handler.
@@ -1385,6 +1166,7 @@ ngx_http_link_func_process_subrequest(ngx_http_request_t *r, ngx_http_link_func_
  * @return
  *   The status of the response generation.
  */
+ // used
 static ngx_int_t
 ngx_http_link_func_precontent_handler(ngx_http_request_t *r) {
     // ngx_str_t                  name;
@@ -1595,6 +1377,7 @@ single_thread:
 
 } /* ngx_http_link_func_precontent_handler */
 
+// used
 static ngx_int_t
 ngx_http_link_func_content_handler(ngx_http_request_t *r) {
     ngx_int_t rc;
@@ -1656,6 +1439,7 @@ ngx_http_link_func_content_handler(ngx_http_request_t *r) {
     return rc;
 } /* ngx_http_link_func_content_handler */
 
+
 static void
 ngx_http_link_func_parse_ext_request_headers(ngx_http_request_t *r, ngx_array_t *ext_req_headers) {
     ngx_uint_t i, nelts;
@@ -1698,6 +1482,7 @@ ngx_http_link_func_parse_ext_request_headers(ngx_http_request_t *r, ngx_array_t 
         hdrs++;
     }
 }
+
 /**
  * Rewrite handler.
  * Ref:: https://github.com/calio/form-input-nginx-module
@@ -1706,6 +1491,8 @@ ngx_http_link_func_parse_ext_request_headers(ngx_http_request_t *r, ngx_array_t 
  * @return
  *   The status of the response generation.
  */
+
+//used
 static ngx_int_t
 ngx_http_link_func_rewrite_handler(ngx_http_request_t *r) {
     ngx_http_link_func_loc_conf_t  *lcf = ngx_http_get_module_loc_conf(r, ngx_http_link_func_module);
@@ -1879,6 +1666,7 @@ ngx_http_link_func_strdup_with_p(ngx_pool_t *pool, const char *src, size_t len) 
     return dst;
 }
 
+// used
 u_char*
 ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen) {
     ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
@@ -1987,6 +1775,7 @@ strpos(const char *haystack, const char *needle) {
     return -1;   // Not found = -1.
 }
 
+//used
 void*
 ngx_link_func_get_query_param(ngx_link_func_ctx_t *ctx, const char *key) {
     ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
@@ -2055,6 +1844,7 @@ ngx_link_func_add_header_in(ngx_link_func_ctx_t *ctx, const char *key, size_t ke
     return 0; // NGX_OK
 }
 
+// used
 int
 ngx_link_func_add_header_out(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen, const char *value, size_t val_len ) {
     ngx_http_request_t *r = (ngx_http_request_t*)ctx->__r__;
@@ -2109,99 +1899,8 @@ ngx_link_func_shm_free_locked(void *shared_mem, void *ptr) {
     ngx_slab_free_locked(((ngx_http_link_func_http_shm_t*)shared_mem)->shpool, ptr);
 }
 
-void*
-ngx_link_func_cache_get(void *shared_mem, const char* key) {
-    ngx_str_t str_key = { ngx_strlen(key), (u_char *) key };
-    uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
-    ngx_http_link_func_http_shm_t *_cache = (ngx_http_link_func_http_shm_t *)shared_mem;
-    ngx_http_link_func_http_cache_value_node_t *cvnt = (ngx_http_link_func_http_cache_value_node_t *)
-            ngx_str_rbtree_lookup(&_cache->rbtree, &str_key, hash);
-    if (cvnt) {
-        return cvnt->value;
-    } else {
-        return NULL;
-    }
-}
 
-/***
-*
-* return old_value if found, else update cache and return new value
-*/
-void*
-ngx_link_func_cache_put(void *shared_mem, const char* key, void* value) {
-    ngx_http_link_func_http_shm_t *_cache = (ngx_http_link_func_http_shm_t *)shared_mem;
-
-    void *old_value;
-    ngx_str_t str_key = { ngx_strlen(key), (u_char *) key };
-    uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
-    ngx_http_link_func_http_cache_value_node_t *cvnt = (ngx_http_link_func_http_cache_value_node_t *)
-            ngx_str_rbtree_lookup(&_cache->rbtree, &str_key, hash);
-    if (cvnt) {
-        old_value = cvnt->value;
-        cvnt->value = value;
-        return old_value;
-    } else {
-        cvnt = (ngx_http_link_func_http_cache_value_node_t *)
-               ngx_slab_alloc_locked(_cache->shpool, sizeof(ngx_http_link_func_http_cache_value_node_t));
-        if (cvnt == NULL) {
-            return NULL;
-        }
-        cvnt->value = value;
-        cvnt->sn.node.key = hash;
-
-        ngx_str_t *new_str_key = &(cvnt->sn.str);
-        new_str_key->len = str_key.len;
-        new_str_key->data = (u_char*) ngx_slab_alloc_locked(_cache->shpool, sizeof(u_char) * (new_str_key->len + 1) );
-        ngx_memcpy(new_str_key->data, str_key.data, new_str_key->len);
-        new_str_key->data[new_str_key->len] = 0;
-        ngx_rbtree_insert(&_cache->rbtree, &cvnt->sn.node);
-        return NULL;
-    }
-}
-
-void*
-ngx_link_func_cache_new(void *shared_mem, const char* key,  size_t size) {
-    ngx_http_link_func_http_shm_t *_cache = (ngx_http_link_func_http_shm_t *)shared_mem;
-    ngx_http_link_func_http_cache_value_node_t *cvnt = (ngx_http_link_func_http_cache_value_node_t *)
-            ngx_slab_alloc_locked(_cache->shpool, sizeof(ngx_http_link_func_http_cache_value_node_t));
-
-    if (cvnt == NULL) {
-        return NULL;
-    }
-
-    ngx_str_t *str_key = &(cvnt->sn.str);
-    str_key->len = ngx_strlen(key);
-    str_key->data = (u_char*) ngx_slab_alloc_locked(_cache->shpool, sizeof(u_char) * (str_key->len + 1) );
-    ngx_memcpy(str_key->data, key, str_key->len);
-    str_key->data[str_key->len] = 0;
-
-    uint32_t hash = ngx_crc32_long(str_key->data, str_key->len);
-
-    cvnt->value = ngx_slab_alloc_locked(_cache->shpool, size);
-    cvnt->sn.node.key = hash;
-    ngx_rbtree_insert(&_cache->rbtree, &cvnt->sn.node);
-    return cvnt->value;
-}
-
-void*
-ngx_link_func_cache_remove(void *shared_mem, const char* key) {
-    void *old_value;
-    ngx_str_t str_key = { ngx_strlen(key), (u_char *) key };
-    uint32_t hash = ngx_crc32_long(str_key.data, str_key.len);
-    ngx_http_link_func_http_shm_t *_cache = (ngx_http_link_func_http_shm_t *)shared_mem;
-    ngx_http_link_func_http_cache_value_node_t *cvnt = (ngx_http_link_func_http_cache_value_node_t *)
-            ngx_str_rbtree_lookup(&_cache->rbtree, &str_key, hash);
-
-    if (cvnt) {
-        old_value = cvnt->value;
-        ngx_slab_free_locked(_cache->shpool, cvnt->sn.str.data);
-        ngx_rbtree_delete(&_cache->rbtree, &cvnt->sn.node);
-        return old_value;
-    }
-
-    return NULL;
-}
-
+// used
 void
 ngx_link_func_write_resp_l(
     ngx_link_func_ctx_t *appctx,
@@ -2262,426 +1961,20 @@ ngx_link_func_write_resp_l(
     internal_ctx->rc = NGX_OK;
 }
 
-void
-ngx_link_func_write_resp(
-    ngx_link_func_ctx_t *appctx,
-    uintptr_t status_code,
-    const char* status_line,
-    const char* content_type,
-    const char* resp_content,
-    size_t resp_len
-) {
-    ngx_link_func_write_resp_l(appctx, status_code,
-                               status_line, status_line ? ngx_strlen(status_line) : 0,
-                               content_type,
-                               content_type ? ngx_strlen(content_type) : 0,
-                               resp_content,
-                               resp_len
-                              );
-}
-
-/****Download Feature Support ****/
-
-static int
-ngx_http_link_func_write_to_file(char* out_path, char* out_buff, size_t size, ngx_conf_t *cf) {
-    FILE* writeFile;
-
-    if ((writeFile = fopen(out_path, "w")) == NULL) {   // Open source file.
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s", "Unable to downloaded the file to the specific location, please check if path existed");
-        return 0;
-    }
-
-    fwrite(out_buff, 1, size, writeFile);
-
-    fclose(writeFile);
-    return 1;
-}
-
-static ngx_http_link_func_http_header_body*
-convert_to_http_header_body(char* final_buf, int curr_size, ngx_conf_t *cf) {
-    ngx_http_link_func_http_header_body *hhb = ngx_palloc(cf->pool, sizeof(ngx_http_link_func_http_header_body));
-    if (hhb) {
-        ngx_memset(hhb, 0, sizeof(ngx_http_link_func_http_header_body));
-        int headerLen = strpos(final_buf, "\r\n\r\n") + 4;
-        hhb->header_content = ngx_pcalloc(cf->pool, (headerLen + 1) * sizeof(char));
-        ngx_memcpy(hhb->header_content, final_buf, headerLen * sizeof(char));
-        hhb->body_content = ngx_pcalloc(cf->pool, ((curr_size - headerLen) + 1) * sizeof(char));
-        ngx_memcpy(hhb->body_content, final_buf + headerLen, (curr_size - headerLen) * sizeof(char));
-        hhb->header_len = headerLen;
-        hhb->body_len = (curr_size - headerLen);
-    }
-    return hhb;
-}
-
-#define NGX_C_FUNC_DFT_DOWNLOAD_BYTESIZE 1024
-
-static int
-ngx_http_link_func_connect_and_request(int *sockfd, ngx_http_link_func_srv_conf_t* scf, ngx_conf_t *cf) {
-    int rc;
-    const char* const_url_str = (const char*) scf->_downloadlink.data;
-    /**  break down parsing **/
-    size_t const_url_str_len = ngx_strlen(const_url_str);
-    char* url_str = ngx_pcalloc(cf->pool, ( const_url_str_len * sizeof(char)) + 1);
-    ngx_memcpy(url_str, const_url_str, const_url_str_len * sizeof(char));
-
-    char *moving_buff = url_str, *temp_, *hostname = NULL , *path = NULL;
-    int port, len_of_data_msg;
-
-    if (ngx_strncmp(moving_buff, "http://", 7) == 0) {
-        moving_buff += 7;
-        port  = 80;
-    } else {
-        /*error*/
-        rc = 0;
-        goto DONE;
-    }
-
-    hostname = moving_buff;
-    if ( (temp_ = ngx_strchr(moving_buff, ':')) ) {
-        moving_buff = temp_ + 1;
-        *temp_ = '\0';
-        if ( (temp_ = ngx_strchr(moving_buff, '/')) ) {
-            path = temp_ + 1;
-            port = atoi(moving_buff);
-            if (port == 0) {
-                /*error*/
-            }
-        }
-    } else if ( (temp_ = ngx_strchr(moving_buff, '/')) ) {
-        path = temp_ + 1;
-        *temp_ = '\0';
-    }
-    /** Done break down parsing **/
-
-    struct hostent *host;
-    struct sockaddr_in dest_addr;
-    ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "%s\n", hostname);
-    ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "%d\n", port);
-    if ( (host = gethostbyname(hostname)) == NULL ) {
-        ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "Can't resolve hostname %s.\n",  hostname);
-        rc = 0;
-        goto DONE;
-    }
-
-    *sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    ngx_memset(&dest_addr, 0, sizeof(dest_addr));
-
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(port);
-    // dest_addr.sin_addr.s_addr = *(long*)(host->h_addr);
-    dest_addr.sin_addr = *((struct in_addr *) host->h_addr);
-
-    if ( connect(*sockfd, (struct sockaddr *) &dest_addr,
-                 sizeof(struct sockaddr)) == -1 ) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Unable connect to host %s - %s on port %d.\n",
-                           hostname, inet_ntoa(dest_addr.sin_addr), port);
-        rc = 0;
-    }
-    rc = 1;
-
-    len_of_data_msg = ngx_strlen(hostname) + 5/*Port number size*/ + ngx_strlen(path) + 101 /**Default header size**/ + scf->_headers.len;
-    u_char *data_to_send = ngx_pcalloc(cf->pool, len_of_data_msg * sizeof(u_char));
-    if (scf->_headers.len > 0) {
-        ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
-                     "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n%s\r\n\r\n", path, hostname, port, scf->_headers.data);
-    } else {
-        ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
-                     "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n\r\n", path, hostname, port);
-    }
-    struct timeval timeout;
-    timeout.tv_sec = 5;
-    timeout.tv_usec = 0;
-    if (setsockopt (*sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
-                    sizeof(timeout)) < 0) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to set setsockopt for time out");
-    }
-
-    // if ( write(*sockfd , data_to_send , len_of_data_msg) != len_of_data_msg)
-    if ( send(*sockfd , data_to_send , ngx_strlen(data_to_send) , 0) < 0) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Send failed");
-        rc = 0;
-    }
-
-    if (data_to_send)
-        ngx_pfree(cf->pool, data_to_send);
-
-DONE:
-    ngx_pfree(cf->pool, url_str);
-    return rc;
-}
-
-
-static ngx_http_link_func_http_header_body*
-ngx_http_link_func_read_data_from_server(int *sockfd, ngx_conf_t *cf) {
-    struct timeval timeout;
-    timeout.tv_sec = 1; // Default 1 sec time out
-    timeout.tv_usec = 0;
-
-    if (setsockopt (*sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
-                    sizeof(timeout)) < 0)
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "failed to set setsockopt for time out");
-
-    char recvBuff[NGX_C_FUNC_DFT_DOWNLOAD_BYTESIZE];
-    int n, curr_size = 0;
-    char *final_buf = NULL, *tempBuff;
-
-    // while ( (n = read(*sockfd, recvBuff, sizeof(recvBuff) - 1)) > 0)
-    while ( (n = recv(*sockfd, recvBuff, sizeof(recvBuff) - 1, 0)) > 0 ) {
-        recvBuff[n] = 0;
-        tempBuff = final_buf;
-        final_buf = ngx_palloc(cf->pool, curr_size + n);
-        if (tempBuff)
-            ngx_memcpy(final_buf, tempBuff, curr_size);
-        ngx_memcpy(final_buf + curr_size, recvBuff, n);
-        curr_size += n;
-
-        if (tempBuff) {
-            ngx_pfree(cf->pool, tempBuff);
-        }
-    }
-
-    if (n < 0)  {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, " There is an error reading data from server");
-    }
-
-    ngx_http_link_func_http_header_body *hhb = convert_to_http_header_body(final_buf, curr_size, cf);
-    ngx_pfree(cf->pool, final_buf);
-    return hhb;
-}
-
-static ngx_http_link_func_http_header_body*
-ngx_http_link_func_http_request(ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf) {
-    int sockfd;
-    ngx_http_link_func_http_header_body* hhb = NULL;
-    if (ngx_http_link_func_connect_and_request(&sockfd, scf , cf)) {
-        hhb = ngx_http_link_func_read_data_from_server(&sockfd, cf);
-        if (hhb) {
-            ngx_http_link_func_write_to_file( (char*) scf->_libname.data, hhb->body_content, hhb->body_len, cf);
-            ngx_pfree(cf->pool, hhb->header_content);
-            ngx_pfree(cf->pool, hhb->body_content);
-            ngx_pfree(cf->pool, hhb);
-        }
-    }
-    close(sockfd);
-    return hhb;
-}
-
-#if (NGX_SSL || NGX_OPENSSL)
-
-static int
-ngx_http_link_func_connect_and_request_via_ssl(int *sockfd, ngx_http_link_func_srv_conf_t* scf, SSL_CTX **ctx, SSL **ssl, ngx_conf_t *cf) {
-    int rc = 1;
-
-    // /*** DISABLE IF NGINX ENABLED ***/
-    // OpenSSL_add_all_algorithms();
-    // ERR_load_BIO_strings();
-    // ERR_load_crypto_strings();
-    // SSL_load_error_strings();
-    // if (SSL_library_init() < 0)
-    //      ngx_conf_log_error(NGX_LOG_EMERG, cf,  0,  "Could not initialize the OpenSSL library !\n");
-
-    if ( (*ctx = SSL_CTX_new(SSLv23_client_method())) == NULL )
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "failed to establish SSL_CTX");
-
-    SSL_CTX_set_options(*ctx, SSL_OP_NO_SSLv2);
-
-    /**** Initialize new SSL connection *****/
-    *ssl = SSL_new(*ctx);
-
-    /***Connecting to Socket***/
-    /**  break down parsing **/
-    size_t const_url_str_len = ngx_strlen(scf->_downloadlink.data);
-    char* url_str = ngx_pcalloc(cf->pool, ( const_url_str_len * sizeof(char)) + 1);
-    ngx_memcpy(url_str, scf->_downloadlink.data, const_url_str_len * sizeof(char));
-
-    char *moving_buff = url_str, *temp_, *hostname = NULL , *path = NULL;
-    int port, len_of_data_msg;
-
-    if (ngx_strncmp(moving_buff, "https://", 8) == 0) {
-        moving_buff += 8;
-        port  = 443;
-    } else {
-        /*error*/
-        rc = 0;
-        goto DONE;
-    }
-
-    hostname = moving_buff;
-    if ( (temp_ = ngx_strchr(moving_buff, ':')) ) {
-        moving_buff = temp_ + 1;
-        *temp_ = '\0';
-        if ( (temp_ = ngx_strchr(moving_buff, '/')) ) {
-            path = temp_ + 1;
-            port = atoi(moving_buff);
-            if (port == 0) {
-                /*error*/
-            }
-        }
-    } else if ( (temp_ = ngx_strchr(moving_buff, '/')) ) {
-        path = temp_ + 1;
-        *temp_ = '\0';
-    }
-    /** Done break down parsing **/
-
-    struct hostent *host;
-    struct sockaddr_in dest_addr;
-    ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "%s\n", hostname);
-    ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "%d\n", port);
-    if ( (host = gethostbyname(hostname)) == NULL ) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Can't resolve hostname %s.\n",  hostname);
-        rc = 0;
-        goto DONE;
-    }
-
-    *sockfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    ngx_memset(&dest_addr, 0, sizeof(dest_addr));
-
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(port);
-    // dest_addr.sin_addr.s_addr = *(long*)(host->h_addr);
-    dest_addr.sin_addr = *((struct in_addr *) host->h_addr);
-
-    if ( connect(*sockfd, (struct sockaddr *) &dest_addr,
-                 sizeof(struct sockaddr)) == -1 ) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Unable connect to host %s - %s on port %d.\n",
-                           hostname, inet_ntoa(dest_addr.sin_addr), port);
-        rc = 0;
-        goto DONE;
-    }
-    /*** done Connecting to Socket***/
-
-    /*** ca cert verification ***/
-    if (scf->_ca_cart.len > 0) {
-        if (SSL_CTX_load_verify_locations(*ctx, (const char*) scf->_ca_cart.data, NULL) == 0) {
-            ngx_conf_log_error(NGX_LOG_WARN, cf,  0, "failed to read ca cert");
-        }
-
-        SSL_set_verify(*ssl, SSL_VERIFY_PEER, NULL);
-    } else {
-        ngx_conf_log_error(NGX_LOG_WARN, cf,  0, " You are connecting without verification, recommended to provide ceert by using \"ngx_http_link_func_ca_cert\" ");
-    }
-
-    SSL_set_fd(*ssl, *sockfd);
-
-    if ( SSL_connect(*ssl) != 1 ) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Unable to connect to ssl session %s", url_str);
-    } else {
-        if (scf->_ca_cart.len > 0) {
-            int vres = SSL_get_verify_result(*ssl);
-            ngx_conf_log_error(NGX_LOG_INFO, cf,  0, "X509 verified result %s", X509_verify_cert_error_string(vres));
-            if (vres != X509_V_OK) {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "SSL verify error: %d\n", SSL_get_error(*ssl, vres));
-                rc = 0;
-                goto DONE;
-            }
-        }
-
-        ngx_conf_log_error(NGX_LOG_DEBUG, cf,  0, "SSL/TLS session is enabled: %s", url_str);
-        int r, request_len;
-
-        /** Now construct our HTTP request, if using http/1.1 please specified Connection: Close to prevent keep-alive issue **/
-        len_of_data_msg = ngx_strlen(hostname) + 5/*Port number size*/ + ngx_strlen(path) + 101 /**Default header size**/ + scf->_headers.len;
-        u_char *data_to_send = ngx_pcalloc(cf->pool, len_of_data_msg * sizeof(u_char));
-        if (scf->_headers.len > 0) {
-            ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
-                         "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n%s\r\n\r\n", path, hostname, port, scf->_headers.data);
-        } else {
-            ngx_snprintf(data_to_send, len_of_data_msg * sizeof(u_char),
-                         "GET /%s HTTP/1.1\r\nHost: %s:%d\r\nConnection: Close\r\nCache-Control: no-cache\r\n\r\n", path, hostname, port);
-        }
-
-        request_len = ngx_strlen(data_to_send);
-        r = SSL_write(*ssl, data_to_send, request_len);
-        switch (SSL_get_error(*ssl, r)) {
-        case SSL_ERROR_NONE:
-            if (request_len != r) {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "Insufficient write data to server");
-                rc = 0;
-            }
-            break;
-        default:
-            ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "error while writing data to server");
-            rc = 0;
-        }
-
-        if (data_to_send)
-            ngx_pfree(cf->pool, data_to_send);
-
-    }
-
-
-DONE:
-    ngx_pfree(cf->pool, url_str);
-    return rc;
-}
-
-static ngx_http_link_func_http_header_body*
-ngx_http_link_func_read_data_from_server_via_ssl(SSL *ssl, ngx_conf_t *cf) {
-    char recvBuff[NGX_C_FUNC_DFT_DOWNLOAD_BYTESIZE];
-    int n, curr_size = 0;
-    char *final_buf = NULL, *tempBuff;
-    ngx_http_link_func_http_header_body *hhb = NULL;
-    for (;;) {
-        if ((n = SSL_read(ssl, recvBuff, sizeof(recvBuff) - 1)) > 0) {
-            recvBuff[n] = 0;
-            tempBuff = final_buf;
-            final_buf = ngx_palloc(cf->pool, curr_size + n);
-            if (tempBuff)
-                ngx_memcpy(final_buf, tempBuff, curr_size);
-            ngx_memcpy(final_buf + curr_size, recvBuff, n);
-            curr_size += n;
-            if (tempBuff) {
-                ngx_pfree(cf->pool, tempBuff);
-            }
-        } else {
-            switch (SSL_get_error(ssl, n)) {
-            case SSL_ERROR_WANT_READ:
-                continue;
-            case SSL_ERROR_ZERO_RETURN:
-                if (SSL_shutdown(ssl) != 1) {
-                    ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "%s\n", "failed to shutting down SSL");
-                }
-                goto done;
-                break;
-            case SSL_ERROR_SYSCALL:
-                goto done;
-            default:
-                ngx_conf_log_error(NGX_LOG_EMERG, cf,  0, "unknown SSL read issue");
-            }
-        }
-    }
-done:
-    hhb = convert_to_http_header_body(final_buf, curr_size, cf);
-    ngx_pfree(cf->pool, final_buf);
-    return hhb;
-}
-
-static ngx_http_link_func_http_header_body*
-ngx_http_link_func_https_request(ngx_conf_t *cf, ngx_http_link_func_srv_conf_t* scf) {
-    int sockfd = -1;
-    ngx_http_link_func_http_header_body* hhb = NULL;
-    SSL_CTX *ctx = NULL;
-    SSL *ssl = NULL;
-    if (ngx_http_link_func_connect_and_request_via_ssl(&sockfd, scf, &ctx, &ssl, cf)) {
-        hhb = ngx_http_link_func_read_data_from_server_via_ssl(ssl, cf);
-        if (hhb) {
-            ngx_http_link_func_write_to_file((char*)scf->_libname.data, hhb->body_content, hhb->body_len, cf);
-            ngx_pfree(cf->pool, hhb->header_content);
-            ngx_pfree(cf->pool, hhb->body_content);
-            ngx_pfree(cf->pool, hhb);
-        }
-    }
-    if (ssl)
-        SSL_free(ssl);
-    if (ctx)
-        SSL_CTX_free(ctx);
-    close(sockfd);
-
-    return hhb;
-}
-
-#endif
-
-/*** End Download Feature Support ***/
+//void
+//ngx_link_func_write_resp(
+//    ngx_link_func_ctx_t *appctx,
+//    uintptr_t status_code,
+//    const char* status_line,
+//    const char* content_type,
+//    const char* resp_content,
+//    size_t resp_len
+//) {
+//    ngx_link_func_write_resp_l(appctx, status_code,
+//                               status_line, status_line ? ngx_strlen(status_line) : 0,
+//                               content_type,
+//                               content_type ? ngx_strlen(content_type) : 0,
+//                               resp_content,
+//                               resp_len
+//                              );
+//}

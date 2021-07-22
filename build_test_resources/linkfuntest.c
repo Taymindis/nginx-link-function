@@ -40,7 +40,7 @@ void my_app_simple_get_delay_greeting(ngx_link_func_ctx_t *ctx) {
     ngx_link_func_log_info(ctx, "Calling back and log from my_app_simple_get");
 
     char *rep = "2 second delay greeting from ngx_link_func testing";
-    sleep(2);
+//    sleep(2);
     ngx_link_func_write_resp(
         ctx,
         200,

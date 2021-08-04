@@ -103,6 +103,7 @@ extern void ngx_link_func_log_err(ngx_link_func_ctx_t *ctx, const char* msg);
  *  
  */
 extern int ngx_link_func_get_uri(ngx_link_func_ctx_t *ctx, ngx_link_func_str_t *str);
+extern u_char* ngx_link_func_get_remote_addr(ngx_link_func_ctx_t *ctx);
 extern u_char* ngx_link_func_get_header(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 extern u_char* ngx_link_func_get_prop(ngx_link_func_ctx_t *ctx, const char *key, size_t keylen);
 extern void* ngx_link_func_get_query_param(ngx_link_func_ctx_t *ctx, const char *key);
